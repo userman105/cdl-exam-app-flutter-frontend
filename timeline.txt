@@ -1,0 +1,10 @@
+Finish the "Remember Me logic"
+Registeration flow handling
+OTP email verification
+Password recovery system
+exams creation
+front end exam navigation
+report card
+profile tracking
+similar questions
+billing system
