@@ -1,5 +1,9 @@
+import 'package:cdl_flutter/verify_otp_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import 'blocs/auth_cubit.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -18,6 +22,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isEmailValid = true;
+
+  bool _validateEmail(String email) {
+    final emailRegex = RegExp(r"^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$");
+    return emailRegex.hasMatch(email);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +39,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Top image
               Image.asset(
                 "assets/icons/cdl_blue.png",
                 height: 180,
@@ -37,7 +46,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Title text
+              
               Text(
                 "Create an Account",
                 style: GoogleFonts.robotoSlab(
@@ -46,63 +55,115 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   color: Colors.black87,
                 ),
               ),
-
-              Text('Sign up now and get started with an account',
-                style: GoogleFonts.robotoSlab(fontSize: 16,
-                    fontWeight: FontWeight.w100),),
-              const SizedBox(height: 30),
-              
-
-
-              // Next button
-              Align(
-                alignment: Alignment.topRight,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3298CB),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                      horizontal: 24,
-                    ),
-                  ),
-                  onPressed: () {
-                    if (_formKey.currentState?.validate() ?? false) {
-                      // Handle registration logic here
-                    }
-                  },
-                  child: Text(
-                    "Next",
-                    style: GoogleFonts.robotoSlab(fontSize: 18),
-                  ),
+              Text(
+                'Sign up now and get started with an account',
+                style: GoogleFonts.robotoSlab(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w100,
                 ),
               ),
-              const SizedBox(height: 20),
 
-              // Registration form
+              Center(
+                child: IconButton(onPressed: (){}, icon: Image.asset("assets/icons/google_icon.png"
+                  ,height: 70, width: 70,)),
+              ),
+              const SizedBox(height: 30),
+
+
               Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    _buildLabeledField(
-                      label: "First Name",
-                      controller: firstNameController,
+                    // First + Last Name side by side
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildLabeledField(
+                            label: "First Name",
+                            controller: firstNameController,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildLabeledField(
+                            label: "Last Name",
+                            controller: lastNameController,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
-                    _buildLabeledField(
-                      label: "Last Name",
-                      controller: lastNameController,
+
+                    // Email Field with hint + validation
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6, right: 8),
+                          child: Text(
+                            "Email",
+                            style: GoogleFonts.robotoSlab(
+                              fontSize: 16,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w300,
+                            ),
+                          ),
+                        ),
+                        TextFormField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: InputDecoration(
+                            hintText: "Cannot be changed later",
+                            hintStyle: const TextStyle(
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 16),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide:
+                              const BorderSide(color: Color(0xFF3298CB)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                  color: _isEmailValid
+                                      ? const Color(0xFF3298CB)
+                                      : Colors.red),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: _isEmailValid
+                                    ? const Color(0xFF3298CB)
+                                    : Colors.red,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _isEmailValid = _validateEmail(value);
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return "Email cannot be empty";
+                            }
+                            if (!_validateEmail(value)) {
+                              return "Enter a valid email address";
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                     ),
+
                     const SizedBox(height: 16),
-                    _buildLabeledField(
-                      label: "Email",
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
+
                     _buildLabeledField(
                       label: "Password",
                       controller: passwordController,
@@ -133,13 +194,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         onPressed: () {
                           setState(() {
-                            _obscureConfirmPassword =
-                            !_obscureConfirmPassword;
+                            _obscureConfirmPassword = !_obscureConfirmPassword;
                           });
                         },
                       ),
                     ),
                   ],
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3298CB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  onPressed: () async {
+                    if (_formKey.currentState?.validate() ?? false) {
+                      final authCubit = context.read<AuthCubit>();
+
+                      // Combine first + last name into userName
+                      final combinedUserName =
+                          "${firstNameController.text.trim()} ${lastNameController.text.trim()}";
+
+                      final result = await authCubit.registerUser(
+                        fName: firstNameController.text.trim(),
+                        lName: lastNameController.text.trim(),
+                        userName: combinedUserName,
+                        email: emailController.text.trim(),
+                        password: passwordController.text,
+                        mobileNumber: "",
+                      );
+
+                      if (result["success"] == true) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => VerifyOtpScreen(
+                              email: emailController.text.trim(),
+                              password: passwordController.text,
+                            ),
+                          ),
+                        );
+                      } else {
+                        print("Registration failed: $result");
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(result["error"] ?? "Registration failed")),
+                        );
+                      }
+                    }
+                  }
+                  ,
+                  child: Text(
+                    "Next",
+                    style: GoogleFonts.robotoSlab(fontSize: 18),
+                  ),
                 ),
               ),
             ],
@@ -160,17 +276,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding:
-          const EdgeInsets.only(bottom: 6, left: 8, right: 8, top: 4),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              label,
-              style: GoogleFonts.robotoSlab(
-                fontSize: 16,
-                color: Colors.black87,
-                fontWeight: FontWeight.w500,
-              ),
+          padding: const EdgeInsets.only(bottom: 6, right: 8),
+          child: Text(
+            label,
+            style: GoogleFonts.robotoSlab(
+              fontSize: 16,
+              color: Colors.black87,
+              fontWeight: FontWeight.w300,
             ),
           ),
         ),

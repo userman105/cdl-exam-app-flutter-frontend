@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:dio/dio.dart';
 
 /// =====================
 /// Auth States
@@ -16,7 +15,7 @@ class AuthLoading extends AuthState {}
 class AuthAuthenticated extends AuthState {
   final String username;
   final String token;
-  final String? profilePath; // optional local profile photo
+  final String? profilePath;
 
   AuthAuthenticated({
     required this.username,
@@ -45,207 +44,224 @@ class AuthError extends AuthState {
 class AuthGuest extends AuthState {}
 
 /// =====================
-///  Auth Cubit
+/// Auth Cubit
 /// =====================
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(AuthInitial());
 
+  final _storage = const FlutterSecureStorage();
   AuthAuthenticated? _lastAuthenticated;
 
-  /// Continue without authentication
-  void continueAsGuest() {
-    print(" continueAsGuest called");
-    emit(AuthGuest());
-  }
+  /// Unified Dio client
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: "http://10.0.2.2:3333",
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {"Content-Type": "application/json"},
+    ),
+  );
 
-  final _storage = const FlutterSecureStorage();
-  /// Login with email + password
+  /// Continue as guest
+  void continueAsGuest() => emit(AuthGuest());
+
+  /// Login
   Future<void> login(String email, String password) async {
-    print(" login() called with email=$email");
     emit(AuthLoading());
-
     try {
-      final uri = Uri.parse("http://10.0.2.2:3333/login");
+      final response = await _dio.post("/login", data: {
+        "email": email,
+        "password": password,
+      });
 
-      final response = await http.post(
-        uri,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "email": email,
-          "password": password,
-        }),
-      );
+      final username = response.data["user"]?["userName"] ?? "User";
+      final token = response.data["token"]?["token"];
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        final username = data["user"]?["userName"] ?? "User";
-        final token = data["token"]?["token"];
-
-        if (token != null) {
-          print("✅ Login success for user=$username, saving token...");
-
-          // 🔒 Save token securely
-          await _storage.write(key: "auth_token", value: token);
-
-          // Emit success state
-          loginSuccess(username, token);
-        } else {
-          emit(AuthError("Invalid response: token missing"));
-        }
+      if (token != null) {
+        await _storage.write(key: "auth_token", value: token);
+        loginSuccess(username, token);
       } else {
-        print("❌ Login failed: ${response.body}");
-        emit(AuthError("Login failed: ${response.body}"));
+        emit(AuthError("Invalid response: token missing"));
       }
-    } catch (e, stack) {
-      print("💥 Login exception: $e\n$stack");
+    } catch (e) {
       emit(AuthError("Login exception: $e"));
     }
   }
 
-
-  ///  Shared handler for login + google login
+  /// Common success handler
   void loginSuccess(String username, String token) {
-    print(" Auth success: $username | $token");
     final authState = AuthAuthenticated(username: username, token: token);
     _lastAuthenticated = authState;
     emit(authState);
   }
 
-
-  /// Update profile photo locally (not server sync)
-  Future<void> updateProfilePhoto(String filePath) async {
-    print(" updateProfilePhoto called with $filePath");
+  /// Update local profile photo
+  void updateProfilePhoto(String filePath) {
     if (state is AuthAuthenticated) {
-      final current = state as AuthAuthenticated;
-      emit(current.copyWith(profilePath: filePath));
-    } else {
-      print(" Tried to update profile photo without being authenticated");
+      emit((state as AuthAuthenticated).copyWith(profilePath: filePath));
     }
   }
 
-  /// Update profile details (server + state)
+  /// Update profile details
   Future<void> updateProfile({
     String? userName,
     String? mobileNumber,
     String? oldPassword,
     String? newPassword,
   }) async {
-    print(" updateProfile called");
-    if (state is! AuthAuthenticated) {
-      print("️ Not authenticated, skipping updateProfile");
-      return;
-    }
+    if (state is! AuthAuthenticated) return;
 
     final current = state as AuthAuthenticated;
     emit(AuthLoading());
 
     try {
-      final url = Uri.parse("http://10.0.2.2:3333/profile");
-      print(" Sending PATCH request to $url with token=${current.token}");
-
-      final body = jsonEncode({
-        if (userName != null) "userName": userName,
-        if (mobileNumber != null) "mobileNumber": mobileNumber,
-        if (oldPassword != null) "oldPassword": oldPassword,
-        if (newPassword != null) "newPassword": newPassword,
-      });
-
-      print(" updateProfile body: $body");
-
-      final response = await http.patch(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer ${current.token}",
+      final response = await _dio.patch(
+        "/profile",
+        data: {
+          if (userName != null) "userName": userName,
+          if (mobileNumber != null) "mobileNumber": mobileNumber,
+          if (oldPassword != null) "oldPassword": oldPassword,
+          if (newPassword != null) "newPassword": newPassword,
         },
-        body: body,
+        options: Options(
+          headers: {"Authorization": "Bearer ${current.token}"},
+        ),
       );
 
-      print(" updateProfile response: ${response.statusCode} ${response.body}");
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final updatedUserName = data['user']['userName'] ?? current.username;
-        emit(current.copyWith(username: updatedUserName));
-        print(" Profile updated successfully");
-      } else {
-        final err = jsonDecode(response.body);
-        print("Profile update failed: ${err["error"] ?? "Unknown error"}");
-        emit(AuthError(err["error"] ?? "Invalid request"));
-        emit(current); // rollback
-      }
+      final updatedUserName =
+          response.data['user']['userName'] ?? current.username;
+      emit(current.copyWith(username: updatedUserName));
     } catch (e) {
-      print(" updateProfile exception: $e");
       emit(AuthError("Profile update failed: $e"));
-      emit(current);
+      emit(current); // rollback
     }
   }
 
-
+  /// Logout
   Future<void> logout() async {
-    print(" logout() called");
-
-    if (_lastAuthenticated == null) {
-      print(" Tried to log out but no authenticated user.");
-      return;
-    }
+    if (_lastAuthenticated == null) return;
 
     final token = _lastAuthenticated!.token;
 
     try {
-      final response = await http.post(
-        Uri.parse("http://10.0.2.2:3333/logout"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token", // send token
-        },
+      await _dio.post(
+        "/logout",
+        options: Options(headers: {"Authorization": "Bearer $token"}),
       );
-
-      if (response.statusCode == 200) {
-        print("  Logout success (server confirmed).");
-      } else {
-        print("  Logout request failed: ${response.statusCode} ${response.body}");
-      }
-    } catch (e) {
-      print(" 💥 Logout request error: $e");
-    }
-
+    } catch (_) {}
 
     await _storage.delete(key: "auth_token");
-    print(" Token removed from secure storage.");
-
-    const storage = FlutterSecureStorage();
-    await storage.delete(key: "auth_token");
-    await storage.delete(key: "username");
+    await _storage.delete(key: "username");
     _lastAuthenticated = null;
     emit(AuthInitial());
-    print(" Local auth state cleared.");
   }
-  Future<void> googleLogin(String username, String token) async {
-    print(" googleLogin() called with username=$username, token=$token");
-    emit(AuthLoading());
 
+  /// Google login
+  void googleLogin(String username, String token) {
+    emit(AuthLoading());
+    loginSuccess(username, token);
+  }
+
+  /// Check token
+  static Future<bool> checkTokenWithBackend(String token) async {
+    final dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3333"));
     try {
-      loginSuccess(username, token);
-      print(" Google login success");
-    } catch (e) {
-      print(" Google login failed with exception: $e");
-      emit(AuthError("Google login failed: $e"));
+      final response = await dio.get(
+        "/auth/check",
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
     }
   }
 
-  static Future<bool> checkTokenWithBackend(String token) async {
-    final response = await http.get(
-      Uri.parse("http://10.0.2.2:3333/auth/check"),
-      headers: {"Authorization": "Bearer $token"},
-    );
-
-    return response.statusCode == 200;
+  /// Register user
+  Future<Map<String, dynamic>> registerUser({
+    required String fName,
+    required String lName,
+    required String userName,
+    required String email,
+    required String password,
+    String? mobileNumber,
+  }) async {
+    try {
+      final response = await _dio.post("/register", data: {
+        "fName": fName,
+        "lName": lName,
+        "userName": userName,
+        "email": email,
+        "password": password,
+        "mobileNumber": mobileNumber ?? "",
+      });
+      return response.data;
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
   }
 
+  /// Verify email
+  Future<Map<String, dynamic>> verifyEmail({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response =
+      await _dio.post("/auth/verify", data: {"email": email, "otp": otp});
+      return {"success": true, "message": response.data["message"]};
+    } on DioException catch (e) {
+      final error = e.response?.data ?? {};
+      return {
+        "success": false,
+        "error": error["error"] ?? "Verification failed",
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  /// Request OTP (resend or new email)
+  Future<Map<String, dynamic>> requestOtp({
+    required String oldEmail,
+    String? newEmail,
+  }) async {
+    try {
+      final response = await _dio.post("/auth/resend-otp", data: {
+        "oldEmail": oldEmail,
+        "newEmail": newEmail ?? oldEmail,
+      });
+      return response.data;
+    } on DioException catch (e) {
+      return {
+        "success": false,
+        "error": e.response?.data["error"] ?? e.message,
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  /// Update email
+  Future<Map<String, dynamic>> updateEmail({
+    required String oldEmail,
+    required String newEmail,
+  }) async {
+    try {
+      final response = await _dio.post(
+        "/auth/update-email",
+        data: {
+          "old_email": oldEmail,
+          "new_email": newEmail,
+        },
+      );
+      return response.data;
+    } on DioException catch (e) {
+      return {
+        "success": false,
+        "error": e.response?.data["error"] ?? e.message,
+      };
+    }
+  }
 
 }
