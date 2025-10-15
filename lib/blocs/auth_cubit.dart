@@ -43,6 +43,13 @@ class AuthError extends AuthState {
 
 class AuthGuest extends AuthState {}
 
+class AuthNeedsVerification extends AuthState {
+  final String email;
+  final String password; // add this
+
+  AuthNeedsVerification({required this.email, required this.password});
+}
+
 /// =====================
 /// Auth Cubit
 /// =====================
@@ -53,7 +60,7 @@ class AuthCubit extends Cubit<AuthState> {
   final _storage = const FlutterSecureStorage();
   AuthAuthenticated? _lastAuthenticated;
 
-  /// Unified Dio client
+
   final Dio _dio = Dio(
     BaseOptions(
       baseUrl: "http://10.0.2.2:3333",
@@ -67,43 +74,85 @@ class AuthCubit extends Cubit<AuthState> {
   void continueAsGuest() => emit(AuthGuest());
 
   /// Login
-  Future<void> login(String email, String password) async {
+  Future<void> login({
+    required String email,
+    required String password,
+  }) async {
     emit(AuthLoading());
+
     try {
-      final response = await _dio.post("/login", data: {
-        "email": email,
-        "password": password,
-      });
+      final response = await _dio.post(
+        "/login",
+        data: {
+          "email": email,
+          "password": password,
+        },
+        options: Options(
+          validateStatus: (status) {
+            // Accept 200 and 403 (unverified)
+            return status == 200 || status == 403;
+          },
+        ),
+      );
 
-      final username = response.data["user"]?["userName"] ?? "User";
-      final token = response.data["token"]?["token"];
+      final data = response.data;
 
-      if (token != null) {
-        await _storage.write(key: "auth_token", value: token);
-        loginSuccess(username, token);
-      } else {
-        emit(AuthError("Invalid response: token missing"));
+      if (response.statusCode == 403) {
+        final errorMsg = (data["error"] ?? data["message"] ?? "").toString().toLowerCase();
+
+        // redirect if the message indicates verification needed
+        if (errorMsg.contains("verify") || errorMsg.contains("unverified")) {
+          emit(AuthNeedsVerification(email: email, password: password));
+          return;
+        }
+
+        // fallback for other 403s
+        emit(AuthError(errorMsg.isNotEmpty ? errorMsg : "Forbidden"));
+        return;
       }
+
+
+      if (response.statusCode == 200) {
+        final username = data["user"]?["userName"] ?? "User";
+        final token = data["token"]?["token"];
+
+        if (token != null) {
+          await _storage.write(key: "auth_token", value: token);
+          loginSuccess(username, token);
+        } else {
+          emit(AuthError("Invalid response: token missing"));
+        }
+        return;
+      }
+
+      emit(AuthError(data["error"] ?? "Login failed"));
+    } on DioException catch (e) {
+      final msg = e.response?.data?["error"] ?? e.message;
+      emit(AuthError("Login failed: $msg"));
     } catch (e) {
       emit(AuthError("Login exception: $e"));
     }
   }
 
-  /// Common success handler
+
+
+
+
+
   void loginSuccess(String username, String token) {
     final authState = AuthAuthenticated(username: username, token: token);
     _lastAuthenticated = authState;
     emit(authState);
   }
 
-  /// Update local profile photo
+
   void updateProfilePhoto(String filePath) {
     if (state is AuthAuthenticated) {
       emit((state as AuthAuthenticated).copyWith(profilePath: filePath));
     }
   }
 
-  /// Update profile details
+
   Future<void> updateProfile({
     String? userName,
     String? mobileNumber,
@@ -157,13 +206,13 @@ class AuthCubit extends Cubit<AuthState> {
     emit(AuthInitial());
   }
 
-  /// Google login
+
   void googleLogin(String username, String token) {
     emit(AuthLoading());
     loginSuccess(username, token);
   }
 
-  /// Check token
+
   static Future<bool> checkTokenWithBackend(String token) async {
     final dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3333"));
     try {
@@ -177,7 +226,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  /// Register user
+
   Future<Map<String, dynamic>> registerUser({
     required String fName,
     required String lName,
@@ -201,7 +250,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  /// Verify email
+
   Future<Map<String, dynamic>> verifyEmail({
     required String email,
     required String otp,
@@ -221,7 +270,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  /// Request OTP (resend or new email)
+
   Future<Map<String, dynamic>> requestOtp({
     required String oldEmail,
     String? newEmail,
@@ -242,7 +291,6 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  /// Update email
   Future<Map<String, dynamic>> updateEmail({
     required String oldEmail,
     required String newEmail,
@@ -263,5 +311,71 @@ class AuthCubit extends Cubit<AuthState> {
       };
     }
   }
+
+  ///=============
+  ///password recovery
+  ///=============
+
+  Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    try {
+      final response = await _dio.post(
+        "/auth/request-password-reset",
+        data: {"email": email},
+      );
+      return {"success": true, "message": response.data["message"]};
+    } on DioException catch (e) {
+      return {
+        "success": false,
+        "error": e.response?.data["error"] ?? "Failed to send OTP",
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  /// Step 2: Verify OTP
+  Future<Map<String, dynamic>> verifyPasswordResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response = await _dio.post(
+        "/auth/verify-reset-otp",
+        data: {"email": email, "otp": otp},
+      );
+      return {"success": true, "message": response.data["message"]};
+    } on DioException catch (e) {
+      return {
+        "success": false,
+        "error": e.response?.data["error"] ?? "Invalid OTP",
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+  /// Step 3: Reset Password
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _dio.post(
+        "/auth/reset-password",
+        data: {"email": email, "otp": otp, "newPassword": newPassword},
+      );
+      return {"success": true, "message": response.data["message"]};
+    } on DioException catch (e) {
+      return {
+        "success": false,
+        "error": e.response?.data["error"] ?? "Failed to reset password",
+      };
+    } catch (e) {
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+
 
 }

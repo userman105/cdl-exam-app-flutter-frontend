@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:cdl_flutter/first_screen.dart';
 import 'package:cdl_flutter/home_screen.dart';
+import 'package:cdl_flutter/verify_otp_screen.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../blocs/auth_cubit.dart';
+import 'password_recovery.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -27,11 +29,11 @@ class _LoginPageState extends State<LoginPage> {
 
   /// Email validation
   bool _validateEmail(String email) {
-    final emailRegex = RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$");
+    final emailRegex = RegExp(r"^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$");
     return emailRegex.hasMatch(email);
   }
 
-
+  /// Google Sign-In (unchanged)
   Future<void> _signInWithGoogle(BuildContext context) async {
     try {
       final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
@@ -74,9 +76,8 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-
   /// Email/password login
-  void _loginWithBackend(BuildContext context) async {
+  void _loginWithBackend(BuildContext context) {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
@@ -92,37 +93,11 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    try {
-      final response = await http.post(
-        Uri.parse("http://10.0.2.2:3333/login"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"email": email, "password": password}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        final username = data["user"]["userName"] ?? "User";
-        final token = data["token"]["token"];
-
-        context.read<AuthCubit>().loginSuccess(username, token);
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Login failed: ${response.body}")),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
-    }
+    context.read<AuthCubit>().login(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +109,6 @@ class _LoginPageState extends State<LoginPage> {
       body: BlocListener<AuthCubit, AuthState>(
         listener: (context, state) async {
           if (state is AuthAuthenticated) {
-
             const storage = FlutterSecureStorage();
             if (_rememberMe) {
               await storage.write(key: "auth_token", value: state.token);
@@ -145,6 +119,18 @@ class _LoginPageState extends State<LoginPage> {
               context,
               MaterialPageRoute(builder: (_) => const HomeScreen()),
             );
+          } else if (state is AuthNeedsVerification) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => VerifyOtpScreen(
+                    email: state.email,
+                    password: state.password,
+                  ),
+                ),
+              );
+            });
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),
@@ -273,35 +259,57 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 16),
 
-              // Sign up link
-              Center(
-                child: RichText(
-                  text: TextSpan(
-                    text: "Don't have an account? ",
-                    style: GoogleFonts.robotoSlab(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: "Sign up",
-                        style: GoogleFonts.robotoSlab(
-                          fontSize: 14,
-                          color: const Color(0xFF3298CB),
-                          decoration: TextDecoration.underline,
-                        ),
-                        recognizer: TapGestureRecognizer()
-                          ..onTap = () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const SplashScreen()),
-                            );
-                          },
+              // Sign up + Forgot password stacked center
+              Column(
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      text: "Don't have an account? ",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 14,
+                        color: Colors.black,
                       ),
-                    ],
+                      children: [
+                        TextSpan(
+                          text: "Sign up",
+                          style: GoogleFonts.robotoSlab(
+                            fontSize: 14,
+                            color: const Color(0xFF3298CB),
+                            decoration: TextDecoration.underline,
+                          ),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SplashScreen(),
+                                ),
+                              );
+                            },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RecoverPasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      "Forgot password?",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 14,
+                        color: const Color(0xFF3298CB),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

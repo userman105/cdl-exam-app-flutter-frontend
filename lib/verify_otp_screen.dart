@@ -9,7 +9,11 @@ class VerifyOtpScreen extends StatefulWidget {
   final String email;
   final String password;
 
-  const VerifyOtpScreen({super.key, required this.email, required this.password});
+  const VerifyOtpScreen({
+    super.key,
+    required this.email,
+    required this.password,
+  });
 
   @override
   State<VerifyOtpScreen> createState() => _VerifyOtpScreenState();
@@ -27,9 +31,19 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
   void initState() {
     super.initState();
     currentEmail = widget.email;
-    _sendOtp(); // send automatically on entry
+
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendOtp();
+    });
   }
 
+  @override
+  void dispose() {
+    _timer?.cancel();
+    otpController.dispose();
+    super.dispose();
+  }
 
   void _startTimer() {
     _timer?.cancel();
@@ -52,23 +66,27 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     final authCubit = context.read<AuthCubit>();
     final messenger = ScaffoldMessenger.of(context);
 
+    print("📨 Sending OTP request for $currentEmail...");
 
     _startTimer();
 
-    final result = await authCubit.requestOtp(newEmail: currentEmail, oldEmail: '');
+    final result = await authCubit.requestOtp(
+      oldEmail: currentEmail,
+      newEmail: null,
+    );
+
+    print("OTP response: $result");
+
     if (!mounted) return;
 
     if (result["success"] == true) {
       messenger.showSnackBar(
         SnackBar(content: Text("OTP sent to $currentEmail")),
       );
-
     } else {
       messenger.showSnackBar(
         SnackBar(content: Text(result["error"] ?? "Failed to send OTP")),
       );
-
-      _timer?.cancel();
       setState(() => _canResend = true);
     }
   }
@@ -113,7 +131,6 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
           const SnackBar(content: Text("Email updated. Sending new OTP...")),
         );
 
-        //
         await _sendOtp();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -121,15 +138,6 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
         );
       }
     }
-  }
-
-
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    otpController.dispose();
-    super.dispose();
   }
 
   @override
@@ -190,11 +198,11 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Resend Code Button
                   TextButton(
                     onPressed: _canResend ? _sendOtp : null,
                     style: TextButton.styleFrom(
-                      foregroundColor: _canResend ? const Color(0xFF3298CB) : Colors.grey,
+                      foregroundColor:
+                      _canResend ? const Color(0xFF3298CB) : Colors.grey,
                     ),
                     child: Text(
                       _canResend
@@ -206,8 +214,6 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                       ),
                     ),
                   ),
-
-
                   TextButton(
                     onPressed: _changeEmail,
                     style: TextButton.styleFrom(
@@ -254,7 +260,11 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                             content: Text("Email verified! Logging you in...")),
                       );
 
-                      await authCubit.login(currentEmail, widget.password);
+                      await authCubit.login(
+                        email: currentEmail,
+                        password: widget.password,
+                      );
+
                       if (!mounted) return;
 
                       nav.pushAndRemoveUntil(
@@ -264,8 +274,9 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                     } else {
                       messenger.showSnackBar(
                         SnackBar(
-                          content: Text(result["error"] ??
-                              "Invalid OTP, please try again"),
+                          content: Text(
+                            result["error"] ?? "Invalid OTP, please try again",
+                          ),
                         ),
                       );
                     }
