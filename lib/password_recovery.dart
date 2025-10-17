@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'blocs/auth_cubit.dart'; // adjust path
-
+import 'password_reset_confirmation.dart';
 /// ================================
 /// Recover Password Screen
 /// ================================
@@ -35,10 +35,6 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
     setState(() => _isLoading = false);
 
     if (result["success"] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("OTP sent to $email")),
-      );
-
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -111,15 +107,24 @@ class ResetPasswordScreen extends StatefulWidget {
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final otpController = TextEditingController();
   final newPasswordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
   bool _isLoading = false;
 
   Future<void> _resetPassword() async {
     final otp = otpController.text.trim();
     final newPassword = newPasswordController.text.trim();
+    final confirmPassword = confirmPasswordController.text.trim();
 
-    if (otp.isEmpty || newPassword.isEmpty) {
+    if (otp.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter OTP and new password")),
+        const SnackBar(content: Text("Please fill in all fields")),
+      );
+      return;
+    }
+
+    if (newPassword != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match")),
       );
       return;
     }
@@ -136,15 +141,26 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     setState(() => _isLoading = false);
 
     if (result["success"] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password reset successfully!")),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PasswordResetConfirmationScreen()),
       );
-      Navigator.pop(context); // go back to login
-    } else {
+    }
+    else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result["error"] ?? "Reset failed")),
       );
     }
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6), // circular rectangle
+      ),
+      labelText: label,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    );
   }
 
   @override
@@ -164,34 +180,70 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               style: GoogleFonts.robotoSlab(fontSize: 16),
             ),
             const SizedBox(height: 16),
+
+            // OTP field
             TextField(
               controller: otpController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: "OTP",
-              ),
+              decoration: _inputDecoration("OTP"),
             ),
             const SizedBox(height: 16),
+
+            // New password
             TextField(
               controller: newPasswordController,
               obscureText: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: "New Password",
-              ),
+              decoration: _inputDecoration("New Password"),
+            ),
+            const SizedBox(height: 16),
+
+            // Confirm password
+            TextField(
+              controller: confirmPasswordController,
+              obscureText: true,
+              decoration: _inputDecoration("Confirm Password"),
             ),
             const SizedBox(height: 20),
+
+            // Reset button
             ElevatedButton(
               onPressed: _isLoading ? null : _resetPassword,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3298CB),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6), // circular rectangle
+                ),
               ),
               child: _isLoading
                   ? const CircularProgressIndicator(color: Colors.white)
                   : Text("Reset Password", style: GoogleFonts.robotoSlab(fontSize: 16)),
             ),
+            TextButton(
+              onPressed: () async {
+                final authCubit = context.read<AuthCubit>();
+                final result = await authCubit.requestPasswordReset(widget.email);
+
+                if (result["success"] == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("New OTP sent to ${widget.email}")),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result["error"] ?? "Failed to send new OTP")),
+                  );
+                }
+              },
+              child: Text(
+                "Request new code",
+                style: GoogleFonts.robotoSlab(
+                  fontSize: 14,
+                  color: const Color(0xFF3298CB),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
