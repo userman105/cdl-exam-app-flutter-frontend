@@ -1,3 +1,4 @@
+import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'blocs/exam_cubit.dart';
@@ -213,10 +214,28 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                           height: 32,
                                         ),
                                         onPressed: () {
+                                          // Snackbar before TTS
+                                          final snackBar = SnackBar(
+                                            elevation: 0,
+                                            backgroundColor: Colors.transparent,
+                                            behavior: SnackBarBehavior.floating,
+                                            content: AwesomeSnackbarContent(
+                                              title: 'Text-to-Speech',
+                                              message: 'Commencing text to speech...',
+                                              contentType: ContentType.help,
+                                            ),
+                                          );
+
+                                          ScaffoldMessenger.of(context)
+                                            ..hideCurrentSnackBar()
+                                            ..showSnackBar(snackBar);
+
+                                          // Build English text
                                           final enText =
-                                              "Question ${index + 1}: ${q['questionText']}. ${answers.asMap().entries.map((e) {
-                                                    return "${e.key + 1}. ${e.value['answerText']}";
-                                                  }).join(". ")}";
+                                              "Q${index + 1}: ${q['questionText']}. ${answers.asMap().entries.map((e) {
+                                            return "${e.key + 1}. ${e.value['answerText']}";
+                                          }).join(", ")}";
+
                                           _speak(enText, langCode: "en-US");
                                         },
                                       ),
@@ -231,9 +250,6 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                         // =====================
                         // Bottom Arabic Card
                         // =====================
-                        // =====================
-// Bottom Arabic Card (with drawer/arrow)
-// =====================
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: Card(
@@ -279,6 +295,23 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                       height: 32,
                                     ),
                                     onPressed: () {
+                                      // Show Awesome Snackbar
+                                      final snackBar = SnackBar(
+                                        elevation: 0,
+                                        backgroundColor: Colors.transparent,
+                                        behavior: SnackBarBehavior.floating,
+                                        content: AwesomeSnackbarContent(
+                                          title: 'Text-to-Speech',
+                                          message: 'Commencing text to speech...',
+                                          contentType: ContentType.help, // you can use success/warning/failure too
+                                        ),
+                                      );
+
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(snackBar);
+
+                                      // Construct text and call TTS
                                       final arText =
                                           "${q['questionTextAr']}. ${answers.asMap().entries.map((e) {
                                         return "${e.key + 1}. ${e.value['answerTextAr']}";
