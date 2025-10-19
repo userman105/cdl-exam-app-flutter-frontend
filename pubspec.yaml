@@ -46,6 +46,7 @@ dependencies:
   awesome_snackbar_content: ^0.1.8
   flutter_secure_storage: ^9.2.4
   dio: ^5.9.0
+  flutter_tts: ^4.2.3
 
 dev_dependencies:
   flutter_test:
@@ -84,6 +85,7 @@ flutter:
     - assets/icons/hex.svg
     - assets/images/password_reset_spalsh.png
     - assets/images/password_resets_ok.png
+    - assets/icons/tts.svg
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

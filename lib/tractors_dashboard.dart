@@ -4,6 +4,60 @@ import 'blocs/exam_cubit.dart';
 import 'first_screen.dart';
 import 'blocs/auth_cubit.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+
+final FlutterTts flutterTts = FlutterTts();
+
+Future<void> _speak(String text, {String langCode = "en-US"}) async {
+  try {
+    await flutterTts.setLanguage(langCode);
+    await flutterTts.setSpeechRate(0.5);
+    await flutterTts.speak(text);
+  } catch (e) {
+    debugPrint("TTS Error: $e");
+  }
+}
+
+
+void _showTtsDialog(BuildContext context, Map<String, dynamic> q) {
+  final answers = q["answers"] as List<dynamic>;
+
+  showDialog(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text("Read Aloud"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ElevatedButton(
+              onPressed: () => _speak("Question: ${q['questionText']}"),
+              child: const Text("Q"),
+            ),
+            ...answers.asMap().entries.map((entry) {
+              final idx = entry.key + 1; // 1,2,3...
+              final ans = entry.value;
+              return ElevatedButton(
+                onPressed: () => _speak("Answer $idx: ${ans['answerText']}"),
+                child: Text(idx.toString()),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Close"),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 class TractorsDashboard extends StatelessWidget {
   const TractorsDashboard({super.key});
 
@@ -13,11 +67,11 @@ class TractorsDashboard extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text("Tractors Dashboard"),
+          title: const Text("Tractors and Trailers"),
           bottom: const TabBar(
             tabs: [
               Tab(text: "Questions Bank"),
-              Tab(text: "Units"),
+              Tab(text: "Exams"),
             ],
           ),
         ),
@@ -47,6 +101,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
   int _currentPage = 0;
   bool _showAnswer = false;
 
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ExamCubit, ExamState>(
@@ -68,7 +123,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                   onPageChanged: (i) {
                     setState(() {
                       _currentPage = i;
-                      _showAnswer = false; // reset when moving
+                      _showAnswer = false;
                     });
                   },
                   itemCount: questions.length,
@@ -96,15 +151,13 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                     Expanded(
                                       child: SingleChildScrollView(
                                         child: Column(
-                                          crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               "Q${index + 1}: ${q['questionText']}",
                                               style: const TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
-                                                fontFamily: 'Roboto',
                                               ),
                                             ),
                                             const Divider(height: 24),
@@ -112,86 +165,60 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                             // English answers
                                             ...answers.map((ans) {
                                               final answerId = ans["answerId"];
-                                              final isCorrect =
-                                                  answerId == questionId;
-                                              final isSelected =
-                                                  selected == answerId;
+                                              final isCorrect = answerId == questionId;
+                                              final isSelected = selected == answerId;
 
-                                              return
-                                                Container(
-                                                  margin: const EdgeInsets.symmetric(vertical: 6),
-                                                  decoration: BoxDecoration(
-                                                    color: _showAnswer && isCorrect
-                                                        ? Colors.green.withOpacity(0.8)
-                                                        : null,
-                                                    borderRadius: BorderRadius.circular(18),
-                                                  ),
-                                                  child: RadioListTile<int>(
-                                                    title: Row(
-                                                      children: [
-                                                        Expanded(
-                                                          child: Text(
-                                                            ans["answerText"],
-                                                            style: TextStyle(
-                                                              fontFamily: 'Roboto',
-                                                              color: _showAnswer && isCorrect
-                                                                  ? Colors.white  // White text when correct answer shown
-                                                                  : Colors.black,  // Default black text
-                                                              fontWeight: _showAnswer && isCorrect
-                                                                  ? FontWeight.bold  // Optional: make it bold too
-                                                                  : FontWeight.normal,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        if (_showAnswer && isCorrect)
-                                                          const Icon(
-                                                            Icons.check_circle,
-                                                            color: Colors.white,  // Changed from green to white
-                                                          ),
-                                                      ],
+                                              return Container(
+                                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: _showAnswer && isCorrect
+                                                      ? Colors.green.withOpacity(0.8)
+                                                      : null,
+                                                  borderRadius: BorderRadius.circular(18),
+                                                ),
+                                                child: RadioListTile<int>(
+                                                  title: Text(
+                                                    ans["answerText"],
+                                                    style: TextStyle(
+                                                      color: _showAnswer && isCorrect
+                                                          ? Colors.white
+                                                          : Colors.black,
                                                     ),
-                                                    value: answerId,
-                                                    groupValue: selected,
-                                                    onChanged: (val) {
-                                                      if (val != null) {
-                                                        context
-                                                            .read<ExamCubit>()
-                                                            .selectAnswer(questionId, val);
-                                                      }
-                                                    },
                                                   ),
-                                                );
+                                                  value: answerId,
+                                                  groupValue: selected,
+                                                  onChanged: (val) {
+                                                    if (val != null) {
+                                                      context.read<ExamCubit>().selectAnswer(
+                                                        questionId,
+                                                        val,
+                                                      );
+                                                    }
+                                                  },
+                                                ),
+                                              );
                                             }),
                                           ],
                                         ),
                                       ),
                                     ),
 
-                                    // Sticky Show Answer
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF64B2EF),
-                                          padding: const EdgeInsets.symmetric(vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          elevation: 4,
+                                    // TTS Button (English)
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: IconButton(
+                                        icon: SvgPicture.asset(
+                                          "assets/icons/tts.svg",
+                                          width: 32,
+                                          height: 32,
                                         ),
                                         onPressed: () {
-                                          setState(() {
-                                            _showAnswer = true;
-                                          });
+                                          final enText =
+                                              "Question ${index + 1}: ${q['questionText']}. ${answers.asMap().entries.map((e) {
+                                                    return "${e.key + 1}. ${e.value['answerText']}";
+                                                  }).join(". ")}";
+                                          _speak(enText, langCode: "en-US");
                                         },
-                                        child: Text(
-                                          "Show Answer",
-                                          style: GoogleFonts.robotoSlab(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
                                       ),
                                     ),
                                   ],
@@ -204,57 +231,94 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                         // =====================
                         // Bottom Arabic Card
                         // =====================
-                        Card(
-                          margin: const EdgeInsets.all(8),
-                          elevation: 3,
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          child: ExpansionTile(
-                            title: const Text(
-                              "عرض السؤال بالعربية",
-                              textDirection: TextDirection.rtl,
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                        // =====================
+// Bottom Arabic Card (with drawer/arrow)
+// =====================
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Card(
+                            elevation: 4,
+                            color:Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    // Arabic question
-                                    Text(
-                                      q["questionTextAr"] ?? "",
-                                      textDirection: TextDirection.rtl,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.black87,
+                            child: ExpansionTile(
+                              initiallyExpanded: false,
+                              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              title: Text(
+                                q["questionTextAr"] ?? "",
+                                textDirection: TextDirection.rtl,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              children: [
+                                const Divider(height: 20),
+                                ...answers.map((ans) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Text(
+                                        ans["answerTextAr"] ?? "",
+                                        textDirection: TextDirection.rtl,
+                                        style: const TextStyle(fontSize: 14, color: Colors.black54),
                                       ),
                                     ),
-                                    const Divider(height: 20),
+                                  );
+                                }),
 
-                                    // Arabic answers
-                                    ...answers.map((ans) {
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 6),
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Text(
-                                            ans["answerTextAr"] ?? "",
-                                            textDirection: TextDirection.rtl,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
+                                // Arabic TTS button
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: IconButton(
+                                    icon: SvgPicture.asset(
+                                      "assets/icons/tts.svg",
+                                      width: 32,
+                                      height: 32,
+                                    ),
+                                    onPressed: () {
+                                      final arText =
+                                          "${q['questionTextAr']}. ${answers.asMap().entries.map((e) {
+                                        return "${e.key + 1}. ${e.value['answerTextAr']}";
+                                      }).join("، ")}";
+                                      _speak(arText, langCode: "ar-SA");
+                                    },
+                                  ),
                                 ),
-                              )
-                            ],
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // =====================
+                        // Show Answer Button
+                        // =====================
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF64B2EF),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _showAnswer = true;
+                                });
+                              },
+                              child:  Text(
+                                "Show Answer",
+                                style: GoogleFonts.robotoSlab(  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -264,7 +328,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
               ),
 
               // =====================
-              // Bottom navigation + slider
+              // Navigation
               // =====================
               Padding(
                 padding: const EdgeInsets.all(12.0),
@@ -282,34 +346,17 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                           : null,
                     ),
                     Expanded(
-                      child: SliderTheme(
-
-                        data: SliderTheme.of(context).copyWith(
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 14, // 🔵 make circle bigger (default is 10)
-                          ),
-                          overlayShape: const RoundSliderOverlayShape(
-                            overlayRadius: 24, // halo effect when dragging
-                          ),
-                          activeTrackColor: const Color(0xFF64B2EF), // match your theme
-                          inactiveTrackColor: Colors.grey[300],
-                          thumbColor: const Color(0xFF64B2EF),
-                          valueIndicatorColor: const Color(0xFF64B2EF),
-                        ),
-
-                        child: Slider(
+                      child: Slider(
                         value: _currentPage.toDouble(),
                         min: 0,
                         max: (questions.length - 1).toDouble(),
                         divisions: questions.length - 1,
                         label: "Q${_currentPage + 1}",
                         onChanged: (val) {
-                        _pageController.jumpToPage(val.toInt());
+                          _pageController.jumpToPage(val.toInt());
                         },
-                        ),
-                        ),
                       ),
-
+                    ),
                     IconButton(
                       icon: const Icon(Icons.arrow_forward),
                       onPressed: _currentPage < questions.length - 1
@@ -323,7 +370,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                     ),
                   ],
                 ),
-              )
+              ),
             ],
           );
         }
@@ -332,6 +379,9 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
     );
   }
 }
+
+
+
 
 
 /// ----------------------
