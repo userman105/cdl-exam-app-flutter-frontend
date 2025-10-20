@@ -87,6 +87,9 @@ flutter:
     - assets/images/password_reset_spalsh.png
     - assets/images/password_resets_ok.png
     - assets/icons/tts.svg
+    - assets/icons/the_star.png
+    - assets/icons/subscription.png
+    - assets/icons/unit_button_icon.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

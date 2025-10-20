@@ -46,33 +46,154 @@ Future<void> speak(
 }
 
 
-class TractorsDashboard extends StatelessWidget {
+class TractorsDashboard extends StatefulWidget {
   const TractorsDashboard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text("Tractors and Trailers"),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: "Questions Bank"),
-              Tab(text: "Exams"),
+  State<TractorsDashboard> createState() => _TractorsDashboardState();
+}
+
+class _TractorsDashboardState extends State<TractorsDashboard>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+
+    _tabController.addListener(() {
+      if (mounted) {
+        setState(() {}); // Refresh when tab changes
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {return Scaffold(
+    appBar: AppBar(
+      title: Text(
+        "Tractors and Trailers",
+        style: GoogleFonts.robotoSlab(
+          fontWeight: FontWeight.w500,
+          fontSize: 16,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Image.asset(
+            "assets/icons/subscription.png", // replace with your image
+            width: 130,
+            height: 130,
+          ),
+          onPressed: () {
+            // TODO: Implement image button functionality
+          },
+        ),
+      ],
+    ),
+    body: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 1,
+          decoration: BoxDecoration(
+            color: Colors.black12,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.9),
+                blurRadius: 8,
+                offset: const Offset(0, 7),
+              ),
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [
-            _QuestionsBankTab(),
-            _UnitsTab(),
-          ],
-        ),
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Image.asset(
+                  "assets/icons/the_star.png",
+                  width: 40,
+                  height: 40,
+                ),
+                const SizedBox(width: 12),
+
+                // Questions Bank button + underline
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () => _tabController.animateTo(0),
+                      child: Text(
+                        "Questions Bank",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (_tabController.index == 0)
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        height: 3,
+                        width: 80,
+                        color: Colors.black,
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+
+                // Exams button + underline
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton(
+                      onPressed: () => _tabController.animateTo(1),
+                      child: Text(
+                        "Exams",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (_tabController.index == 1)
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        height: 3,
+                        width: 50,
+                        color: Colors.black,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Tab content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                _QuestionsBankTab(),
+                _UnitsTab(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+
 
 /// ----------------------
 /// Questions Bank Tab
@@ -464,24 +585,88 @@ class _UnitsTab extends StatelessWidget {
     );
   }
 
-  Widget _buildUnitButton(BuildContext context, String title, List<dynamic> questions) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 6,
-      ),
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => UnitQuestionsScreen(title: title, questions: questions),
+  Widget _buildUnitButton(
+      BuildContext context, String title, List<dynamic> questions) {
+    final questionCount = questions.length;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        elevation: 4,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    UnitQuestionsScreen(title: title, questions: questions),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top row: icon + title + chevron
+                Row(
+                  children: [
+                    Image.asset(
+                      "assets/icons/unit_button_icon.png",
+                      width: 28,
+                      height: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF878C9F), // greyish color
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.black54),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Bottom row: no. of questions + progress bar
+                Row(
+                  children: [
+                    Text(
+                      "$questionCount Questions",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: 0.0, // TODO: bind to actual progress
+                          minHeight: 10,
+                          backgroundColor: const Color(0xFFD9D9D9),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Colors.blue,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        );
-      },
-      child: Text(title, style: const TextStyle(fontSize: 16)),
+        ),
+      ),
     );
   }
 }
@@ -489,7 +674,7 @@ class _UnitsTab extends StatelessWidget {
 /// ----------------------
 /// Unit Questions Screen
 /// ----------------------
-class UnitQuestionsScreen extends StatelessWidget {
+class UnitQuestionsScreen extends StatefulWidget {
   final String title;
   final List<dynamic> questions;
 
@@ -500,19 +685,41 @@ class UnitQuestionsScreen extends StatelessWidget {
   });
 
   @override
+  State<UnitQuestionsScreen> createState() => _UnitQuestionsScreenState();
+}
+
+class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text(widget.title)),
       body: BlocBuilder<ExamCubit, ExamState>(
-        builder: (context, state) {
-          if (state is! ExamLoaded) {
+        builder: (context, examState) {
+          if (examState is! ExamLoaded) {
             return const Center(child: CircularProgressIndicator());
           }
 
+          final questions = widget.questions;
+
           return PageView.builder(
+            controller: _pageController,
             itemCount: questions.length,
             itemBuilder: (context, index) {
-              final q = questions[index];
+              final q = questions[index] as Map<String, dynamic>;
               final answers = q["answers"] as List<dynamic>;
               final questionId = q["questionId"];
 
@@ -554,7 +761,7 @@ class UnitQuestionsScreen extends StatelessWidget {
                               RadioListTile<int>(
                                 title: Text(ans["answerText"]),
                                 value: answerId,
-                                groupValue: state.selectedAnswers[questionId],
+                                groupValue: examState.selectedAnswers[questionId],
                                 onChanged: (val) {
                                   if (val != null) {
                                     context.read<ExamCubit>().selectAnswer(questionId, val);
@@ -580,8 +787,8 @@ class UnitQuestionsScreen extends StatelessWidget {
                           alignment: Alignment.bottomRight,
                           child: ElevatedButton(
                             onPressed: () async {
-                              final state = context.read<AuthCubit>().state;
-                              final isGuest = state is AuthGuest;
+                              final authState = context.read<AuthCubit>().state;
+                              final isGuest = authState is AuthGuest;
 
                               if (isGuest) {
                                 showDialog(
@@ -604,12 +811,11 @@ class UnitQuestionsScreen extends StatelessWidget {
                                 );
                               } else {
                                 // TODO: Send JSON request here
-                                // Example:
                                 // await context.read<ExamCubit>().submitAnswer(questionId);
 
                                 // Go to next question
                                 if (index < questions.length - 1) {
-                                  PageController().jumpToPage(index + 1);
+                                  _pageController.jumpToPage(index + 1);
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text("You have completed this unit!")),
@@ -619,7 +825,6 @@ class UnitQuestionsScreen extends StatelessWidget {
                             },
                             child: const Text("Submit"),
                           ),
-
                         ),
                       ],
                     ),
