@@ -7,12 +7,36 @@ import 'blocs/auth_cubit.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 final FlutterTts flutterTts = FlutterTts();
 
-Future<void> _speak(String text, {String langCode = "en-US"}) async {
+
+Future<void> speak(
+    String text,
+    BuildContext context, {
+      String langCode = "en-US",
+    }) async {
   try {
+    // Check connectivity first
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) {
+      // Show awesome snackbar for no internet
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          behavior: SnackBarBehavior.floating,
+          content: AwesomeSnackbarContent(
+            title: 'No Internet!',
+            message: 'Text-to-Speech requires an internet connection.',
+            contentType: ContentType.failure,
+          ),
+        ),
+      );
+      return;
+    }
+
     await flutterTts.setLanguage(langCode);
     await flutterTts.setSpeechRate(0.5);
     await flutterTts.speak(text);
@@ -21,43 +45,6 @@ Future<void> _speak(String text, {String langCode = "en-US"}) async {
   }
 }
 
-
-void _showTtsDialog(BuildContext context, Map<String, dynamic> q) {
-  final answers = q["answers"] as List<dynamic>;
-
-  showDialog(
-    context: context,
-    builder: (ctx) {
-      return AlertDialog(
-        title: const Text("Read Aloud"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ElevatedButton(
-              onPressed: () => _speak("Question: ${q['questionText']}"),
-              child: const Text("Q"),
-            ),
-            ...answers.asMap().entries.map((entry) {
-              final idx = entry.key + 1; // 1,2,3...
-              final ans = entry.value;
-              return ElevatedButton(
-                onPressed: () => _speak("Answer $idx: ${ans['answerText']}"),
-                child: Text(idx.toString()),
-              );
-            }),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Close"),
-          ),
-        ],
-      );
-    },
-  );
-}
 
 class TractorsDashboard extends StatelessWidget {
   const TractorsDashboard({super.key});
@@ -93,15 +80,23 @@ class TractorsDashboard extends StatelessWidget {
 class _QuestionsBankTab extends StatefulWidget {
   const _QuestionsBankTab();
 
+
   @override
   State<_QuestionsBankTab> createState() => _QuestionsBankTabState();
 }
+
 
 class _QuestionsBankTabState extends State<_QuestionsBankTab> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _showAnswer = false;
 
+
+  @override
+  void dispose() {
+    flutterTts.stop();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +162,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                             ...answers.map((ans) {
                                               final answerId = ans["answerId"];
                                               final isCorrect = answerId == questionId;
-                                              final isSelected = selected == answerId;
+                                              final _ = selected == answerId;
 
                                               return Container(
                                                 margin: const EdgeInsets.symmetric(vertical: 6),
@@ -236,7 +231,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                             return "${e.key + 1}. ${e.value['answerText']}";
                                           }).join(", ")}";
 
-                                          _speak(enText, langCode: "en-US");
+                                          speak(enText,context, langCode: "en-US");
                                         },
                                       ),
                                     ),
@@ -254,23 +249,40 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           child: Card(
                             elevation: 4,
-                            color:Colors.white,
+                            color: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: ExpansionTile(
                               initiallyExpanded: false,
                               tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              title: Text(
-                                q["questionTextAr"] ?? "",
-                                textDirection: TextDirection.rtl,
-                                style: const TextStyle(
+                              title: const Text(
+                                "Show Arabic Translation",  // 👈 fixed title
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               children: [
                                 const Divider(height: 20),
+
+                                // Arabic Question
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      q["questionTextAr"] ?? "",
+                                      textDirection: TextDirection.rtl,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Arabic Answers
                                 ...answers.map((ans) {
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
@@ -303,7 +315,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                         content: AwesomeSnackbarContent(
                                           title: 'Text-to-Speech',
                                           message: 'Commencing text to speech...',
-                                          contentType: ContentType.help, // you can use success/warning/failure too
+                                          contentType: ContentType.help,
                                         ),
                                       );
 
@@ -316,7 +328,8 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                                           "${q['questionTextAr']}. ${answers.asMap().entries.map((e) {
                                         return "${e.key + 1}. ${e.value['answerTextAr']}";
                                       }).join("، ")}";
-                                      _speak(arText, langCode: "ar-SA");
+
+                                      speak(arText, context, langCode: "ar-SA");
                                     },
                                   ),
                                 ),
@@ -324,7 +337,6 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                             ),
                           ),
                         ),
-
                         // =====================
                         // Show Answer Button
                         // =====================
