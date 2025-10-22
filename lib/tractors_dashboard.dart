@@ -1,16 +1,18 @@
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'blocs/exam_cubit.dart';
-import 'first_screen.dart';
-import 'blocs/auth_cubit.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'blocs/exam_cubit.dart';
+
+
+// =====================
+// Global TTS Instance
+// =====================
 final FlutterTts flutterTts = FlutterTts();
-
 
 Future<void> speak(
     String text,
@@ -18,34 +20,31 @@ Future<void> speak(
       String langCode = "en-US",
     }) async {
   try {
-    // Check connectivity first
-    final connectivity = await Connectivity().checkConnectivity();
-    if (connectivity == ConnectivityResult.none) {
-      // Show awesome snackbar for no internet
+    await flutterTts.setLanguage(langCode);
+    await flutterTts.setSpeechRate(0.5);
+    await flutterTts.speak(text);
+  } catch (e) {
+    debugPrint("TTS Error: $e");
+    if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           elevation: 0,
           backgroundColor: Colors.transparent,
           behavior: SnackBarBehavior.floating,
           content: AwesomeSnackbarContent(
-            title: 'No Internet!',
-            message: 'Text-to-Speech requires an internet connection.',
+            title: 'TTS Error',
+            message: 'Unable to play text-to-speech.',
             contentType: ContentType.failure,
           ),
         ),
       );
-      return;
     }
-
-    await flutterTts.setLanguage(langCode);
-    await flutterTts.setSpeechRate(0.5);
-    await flutterTts.speak(text);
-  } catch (e) {
-    debugPrint("TTS Error: $e");
   }
 }
 
-
+// =====================
+// Main Dashboard
+// =====================
 class TractorsDashboard extends StatefulWidget {
   const TractorsDashboard({super.key});
 
@@ -57,16 +56,19 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  int _unitCurrentIndex = 0;
+  int _unitTotal = 0;
+  int _correctCount = 0;
+  int _wrongCount = 0;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-
     _tabController.addListener(() {
-      if (mounted) {
-        setState(() {}); // Refresh when tab changes
-      }
+      if (mounted) setState(() {});
     });
+    _loadHeaderProgress();
   }
 
   @override
@@ -75,147 +77,170 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     super.dispose();
   }
 
+  Future<void> _loadHeaderProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getInt('progress_A Real Exam') ?? 0;
+
+    setState(() {
+      _unitCurrentIndex = saved;
+    });
+
+    final examState = context.read<ExamCubit>().state;
+    if (examState is ExamLoaded) {
+      final questions = examState.examData['questions'] as List<dynamic>;
+      final unit1 = questions.take(30).toList();
+      _unitTotal = unit1.length;
+
+      final selectedMap = examState.selectedAnswers;
+      var correct = 0;
+      var wrong = 0;
+
+      for (var q in unit1) {
+        final qid = q['questionId'];
+        final sel = selectedMap[qid];
+        if (sel != null) {
+          if (sel == qid) {
+            correct++;
+          } else {
+            wrong++;
+          }
+        }
+      }
+
+      setState(() {
+        _correctCount = correct;
+        _wrongCount = wrong;
+      });
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {return Scaffold(
-    appBar: AppBar(
-      title: Text(
-        "Tractors and Trailers",
-        style: GoogleFonts.robotoSlab(
-          fontWeight: FontWeight.w500,
-          fontSize: 16,
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: Image.asset(
-            "assets/icons/subscription.png", // replace with your image
-            width: 130,
-            height: 130,
+  Widget build(BuildContext context) {
+    return BlocListener<ExamCubit, ExamState>(
+      listenWhen: (_, __) => true,
+      listener: (_, __) => _loadHeaderProgress(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            "Tractors and Trailers",
+            style: GoogleFonts.robotoSlab(
+              fontWeight: FontWeight.w500,
+              fontSize: 16,
+            ),
           ),
-          onPressed: () {
-            // TODO: Implement image button functionality
-          },
-        ),
-      ],
-    ),
-    body: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          height: 1,
-          decoration: BoxDecoration(
-            color: Colors.black12,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.9),
-                blurRadius: 8,
-                offset: const Offset(0, 7),
+          actions: [
+            IconButton(
+              icon: Image.asset(
+                "assets/icons/subscription.png",
+                width: 134,
+                height: 134,
               ),
-            ],
+              onPressed: () {
+                // TODO: Implement subscription functionality
+              },
+            ),
+          ],
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top border shadow
+            Container(
+              height: 1,
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
+              ),
+            ),
+
+            // Tab buttons row
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Image.asset(
+                    "assets/icons/the_star.png",
+                    width: 40,
+                    height: 40,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildTabButton("Questions Bank", 0, 86),
+                  const SizedBox(width: 12),
+                  _buildTabButton("Exams", 1, 50),
+                ],
+              ),
+            ),
+
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: const [
+                  _QuestionsBankTab(),
+                  _UnitsTab(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String text, int index, double underlineWidth) {
+    final isActive = _tabController.index == index;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TextButton(
+          onPressed: () => _tabController.animateTo(index),
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Image.asset(
-                  "assets/icons/the_star.png",
-                  width: 40,
-                  height: 40,
-                ),
-                const SizedBox(width: 12),
-
-                // Questions Bank button + underline
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(
-                      onPressed: () => _tabController.animateTo(0),
-                      child: Text(
-                        "Questions Bank",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (_tabController.index == 0)
-                      Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        height: 3,
-                        width: 80,
-                        color: Colors.black,
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-
-                // Exams button + underline
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextButton(
-                      onPressed: () => _tabController.animateTo(1),
-                      child: Text(
-                        "Exams",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (_tabController.index == 1)
-                      Container(
-                        margin: const EdgeInsets.only(top: 2),
-                        height: 3,
-                        width: 50,
-                        color: Colors.black,
-                      ),
-                  ],
-                ),
-              ],
-            ),
+        if (isActive)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            height: 4,
+            width: underlineWidth,
+            color: Colors.black,
           ),
-
-          // Tab content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: const [
-                _QuestionsBankTab(),
-                _UnitsTab(),
-              ],
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
 
-
-/// ----------------------
-/// Questions Bank Tab
-/// ----------------------
+// =====================
+// Questions Bank Tab
+// =====================
 class _QuestionsBankTab extends StatefulWidget {
   const _QuestionsBankTab();
-
 
   @override
   State<_QuestionsBankTab> createState() => _QuestionsBankTabState();
 }
-
 
 class _QuestionsBankTabState extends State<_QuestionsBankTab> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _showAnswer = false;
 
-
   @override
   void dispose() {
     flutterTts.stop();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -245,298 +270,11 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                   },
                   itemCount: questions.length,
                   itemBuilder: (context, index) {
-                    final q = questions[index];
-                    final answers = q["answers"] as List<dynamic>;
-                    final questionId = q["questionId"];
-                    final selected = state.selectedAnswers[questionId];
-
-                    return Column(
-                      children: [
-                        // =====================
-                        // Top English Card
-                        // =====================
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Card(
-                              elevation: 4,
-                              color: Colors.white,
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  children: [
-                                    Expanded(
-                                      child: SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              "Q${index + 1}: ${q['questionText']}",
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const Divider(height: 24),
-
-                                            // English answers
-                                            ...answers.map((ans) {
-                                              final answerId = ans["answerId"];
-                                              final isCorrect = answerId == questionId;
-                                              final _ = selected == answerId;
-
-                                              return Container(
-                                                margin: const EdgeInsets.symmetric(vertical: 6),
-                                                decoration: BoxDecoration(
-                                                  color: _showAnswer && isCorrect
-                                                      ? Colors.green.withOpacity(0.8)
-                                                      : null,
-                                                  borderRadius: BorderRadius.circular(18),
-                                                ),
-                                                child: RadioListTile<int>(
-                                                  title: Text(
-                                                    ans["answerText"],
-                                                    style: TextStyle(
-                                                      color: _showAnswer && isCorrect
-                                                          ? Colors.white
-                                                          : Colors.black,
-                                                    ),
-                                                  ),
-                                                  value: answerId,
-                                                  groupValue: selected,
-                                                  onChanged: (val) {
-                                                    if (val != null) {
-                                                      context.read<ExamCubit>().selectAnswer(
-                                                        questionId,
-                                                        val,
-                                                      );
-                                                    }
-                                                  },
-                                                ),
-                                              );
-                                            }),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-
-                                    // TTS Button (English)
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: IconButton(
-                                        icon: SvgPicture.asset(
-                                          "assets/icons/tts.svg",
-                                          width: 32,
-                                          height: 32,
-                                        ),
-                                        onPressed: () {
-                                          // Snackbar before TTS
-                                          final snackBar = SnackBar(
-                                            elevation: 0,
-                                            backgroundColor: Colors.transparent,
-                                            behavior: SnackBarBehavior.floating,
-                                            content: AwesomeSnackbarContent(
-                                              title: 'Text-to-Speech',
-                                              message: 'Commencing text to speech...',
-                                              contentType: ContentType.help,
-                                            ),
-                                          );
-
-                                          ScaffoldMessenger.of(context)
-                                            ..hideCurrentSnackBar()
-                                            ..showSnackBar(snackBar);
-
-                                          // Build English text
-                                          final enText =
-                                              "Q${index + 1}: ${q['questionText']}. ${answers.asMap().entries.map((e) {
-                                            return "${e.key + 1}. ${e.value['answerText']}";
-                                          }).join(", ")}";
-
-                                          speak(enText,context, langCode: "en-US");
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // =====================
-                        // Bottom Arabic Card
-                        // =====================
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Card(
-                            elevation: 4,
-                            color: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ExpansionTile(
-                              initiallyExpanded: false,
-                              tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              title: const Text(
-                                "Show Arabic Translation",  // 👈 fixed title
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              children: [
-                                const Divider(height: 20),
-
-                                // Arabic Question
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Text(
-                                      q["questionTextAr"] ?? "",
-                                      textDirection: TextDirection.rtl,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                // Arabic Answers
-                                ...answers.map((ans) {
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                                    child: Align(
-                                      alignment: Alignment.centerRight,
-                                      child: Text(
-                                        ans["answerTextAr"] ?? "",
-                                        textDirection: TextDirection.rtl,
-                                        style: const TextStyle(fontSize: 14, color: Colors.black54),
-                                      ),
-                                    ),
-                                  );
-                                }),
-
-                                // Arabic TTS button
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: IconButton(
-                                    icon: SvgPicture.asset(
-                                      "assets/icons/tts.svg",
-                                      width: 32,
-                                      height: 32,
-                                    ),
-                                    onPressed: () {
-                                      // Show Awesome Snackbar
-                                      final snackBar = SnackBar(
-                                        elevation: 0,
-                                        backgroundColor: Colors.transparent,
-                                        behavior: SnackBarBehavior.floating,
-                                        content: AwesomeSnackbarContent(
-                                          title: 'Text-to-Speech',
-                                          message: 'Commencing text to speech...',
-                                          contentType: ContentType.help,
-                                        ),
-                                      );
-
-                                      ScaffoldMessenger.of(context)
-                                        ..hideCurrentSnackBar()
-                                        ..showSnackBar(snackBar);
-
-                                      // Construct text and call TTS
-                                      final arText =
-                                          "${q['questionTextAr']}. ${answers.asMap().entries.map((e) {
-                                        return "${e.key + 1}. ${e.value['answerTextAr']}";
-                                      }).join("، ")}";
-
-                                      speak(arText, context, langCode: "ar-SA");
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // =====================
-                        // Show Answer Button
-                        // =====================
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF64B2EF),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _showAnswer = true;
-                                });
-                              },
-                              child:  Text(
-                                "Show Answer",
-                                style: GoogleFonts.robotoSlab(  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
+                    return _buildQuestionPage(context, questions, index, state);
                   },
                 ),
               ),
-
-              // =====================
-              // Navigation
-              // =====================
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: _currentPage > 0
-                          ? () {
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                          : null,
-                    ),
-                    Expanded(
-                      child: Slider(
-                        value: _currentPage.toDouble(),
-                        min: 0,
-                        max: (questions.length - 1).toDouble(),
-                        divisions: questions.length - 1,
-                        label: "Q${_currentPage + 1}",
-                        onChanged: (val) {
-                          _pageController.jumpToPage(val.toInt());
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.arrow_forward),
-                      onPressed: _currentPage < questions.length - 1
-                          ? () {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
+              _buildNavigationBar(questions.length),
             ],
           );
         }
@@ -544,17 +282,372 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
       },
     );
   }
+
+  Widget _buildQuestionPage(
+      BuildContext context,
+      List<dynamic> questions,
+      int index,
+      ExamLoaded state,
+      ) {
+    final q = questions[index];
+    final answers = q["answers"] as List<dynamic>;
+    final questionId = q["questionId"];
+    final selected = state.selectedAnswers[questionId];
+
+    return Column(
+      children: [
+        // English Card
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Card(
+              elevation: 4,
+              color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Q${index + 1}: ${q['questionText']}",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Divider(height: 24),
+                            ...answers.map((ans) => _buildAnswerOption(
+                              ans,
+                              questionId,
+                              selected,
+                              context,
+                            )),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // TTS Button
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: SvgPicture.asset(
+                          "assets/icons/tts.svg",
+                          width: 32,
+                          height: 32,
+                        ),
+                        onPressed: () => _playEnglishTTS(context, q, answers, index),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Arabic Card
+        _buildArabicCard(q, answers, index),
+
+        // Show Answer Button
+        _buildShowAnswerButton(context, questions, index),
+      ],
+    );
+  }
+
+  Widget _buildAnswerOption(
+      dynamic ans,
+      int questionId,
+      int? selected,
+      BuildContext context,
+      ) {
+    final answerId = ans["answerId"];
+    final isCorrect = answerId == questionId;
+    final isSelected = selected == answerId;
+
+    Color? bg;
+    Color textColor = Colors.black;
+
+    if (_showAnswer && isCorrect) {
+      bg = Colors.green.withOpacity(0.85);
+      textColor = Colors.white;
+    } else if (_showAnswer && isSelected && !isCorrect) {
+      bg = Colors.red.withOpacity(0.85);
+      textColor = Colors.white;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black12),
+      ),
+      child: RadioListTile<int>(
+        title: Text(
+          ans["answerText"],
+          style: TextStyle(color: textColor),
+        ),
+        value: answerId,
+        groupValue: selected,
+        onChanged: (val) {
+          if (val != null && !_showAnswer) {
+            context.read<ExamCubit>().selectAnswer(questionId, val);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildArabicCard(dynamic q, List<dynamic> answers, int index) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Card(
+        elevation: 4,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          title: const Text(
+            "Show Arabic Translation",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          children: [
+            const Divider(height: 20),
+            // Arabic Question
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  q["questionTextAr"] ?? "",
+                  textDirection: TextDirection.rtl,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            // Arabic Answers
+            ...answers.map((ans) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    ans["answerTextAr"] ?? "",
+                    textDirection: TextDirection.rtl,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // Arabic TTS button
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: SvgPicture.asset(
+                  "assets/icons/tts.svg",
+                  width: 32,
+                  height: 32,
+                ),
+                onPressed: () => _playArabicTTS(context, q, answers),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShowAnswerButton(
+      BuildContext context,
+      List<dynamic> questions,
+      int index,
+      ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF64B2EF),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          onPressed: () async {
+            setState(() {
+              _showAnswer = true;
+            });
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setInt('progress_questionsbank', _currentPage);
+
+            await Future.delayed(const Duration(seconds: 1));
+
+            if (mounted) {
+              setState(() {
+                _showAnswer = false;
+              });
+
+              if (index < questions.length - 1) {
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("You have reached the last question"),
+                  ),
+                );
+              }
+            }
+          },
+          child: Text(
+            "Show Answer",
+            style: GoogleFonts.robotoSlab(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationBar(int totalQuestions) {
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _currentPage > 0
+                ? () {
+              _pageController.previousPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+                : null,
+          ),
+          Expanded(
+            child: Slider(
+              value: _currentPage.toDouble(),
+              min: 0,
+              max: (totalQuestions - 1).toDouble(),
+              divisions: totalQuestions - 1,
+              label: "Q${_currentPage + 1}",
+              onChanged: (val) {
+                _pageController.jumpToPage(val.toInt());
+              },
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward),
+            onPressed: _currentPage < totalQuestions - 1
+                ? () {
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _playEnglishTTS(
+      BuildContext context,
+      dynamic q,
+      List<dynamic> answers,
+      int index,
+      ) {
+    final snackBar = SnackBar(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      behavior: SnackBarBehavior.floating,
+      content: AwesomeSnackbarContent(
+        title: 'Text-to-Speech',
+        message: 'Commencing text to speech...',
+        contentType: ContentType.help,
+      ),
+    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(snackBar);
+
+    final enText = "Q${index + 1}: ${q['questionText']}. ${answers.asMap().entries.map((e) {
+      return "${e.key + 1}. ${e.value['answerText']}";
+    }).join(", ")}";
+
+    speak(enText, context, langCode: "en-US");
+  }
+
+  void _playArabicTTS(
+      BuildContext context,
+      dynamic q,
+      List<dynamic> answers,
+      ) {
+    final snackBar = SnackBar(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      behavior: SnackBarBehavior.floating,
+      content: AwesomeSnackbarContent(
+        title: 'Text-to-Speech',
+        message: 'Commencing text to speech...',
+        contentType: ContentType.help,
+      ),
+    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(snackBar);
+
+    final arText = "${q['questionTextAr']}. ${answers.asMap().entries.map((e) {
+      return "${e.key + 1}. ${e.value['answerTextAr']}";
+    }).join("، ")}";
+
+    speak(arText, context, langCode: "ar-SA");
+  }
 }
 
-
-
-
-
-/// ----------------------
-/// Units Tab
-/// ----------------------
-class _UnitsTab extends StatelessWidget {
+// =====================
+// Units Tab
+// =====================
+class _UnitsTab extends StatefulWidget {
   const _UnitsTab();
+
+  @override
+  State<_UnitsTab> createState() => _UnitsTabState();
+}
+
+class _UnitsTabState extends State<_UnitsTab> {
+  final Map<String, double> _unitProgress = {};
+
+  void _updateProgress(String title, double progress) {
+    setState(() => _unitProgress[title] = progress);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -565,19 +658,17 @@ class _UnitsTab extends StatelessWidget {
         }
 
         final questions = state.examData["questions"] as List<dynamic>;
-        final unit1 = questions.take(30).toList();
-        final unit2 = questions.skip(30).take(30).toList();
-        final unit3 = questions.skip(60).toList();
+        final total = questions.length;
 
         return Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              _buildUnitButton(context, "Unit 1 (Q1–30)", unit1),
+              _buildUnitButton(context, "Unit 1 (Q1–30)", questions, 0, 30.clamp(0, total)),
               const SizedBox(height: 20),
-              _buildUnitButton(context, "Unit 2 (Q31–60)", unit2),
+              _buildUnitButton(context, "Unit 2 (Q31–60)", questions, 30, 60.clamp(0, total)),
               const SizedBox(height: 20),
-              _buildUnitButton(context, "Unit 3 (Q61–64)", unit3),
+              _buildUnitButton(context, "Unit 3 (Q61–$total)", questions, 60, total),
             ],
           ),
         );
@@ -586,8 +677,17 @@ class _UnitsTab extends StatelessWidget {
   }
 
   Widget _buildUnitButton(
-      BuildContext context, String title, List<dynamic> questions) {
-    final questionCount = questions.length;
+      BuildContext context,
+      String title,
+      List<dynamic> allQuestions,
+      int startIndex,
+      int endIndex,
+      ) {
+    final count = endIndex - startIndex;
+    if (count <= 0) return const SizedBox.shrink();
+
+    final progress = _unitProgress[title] ?? 0.0;
+    final unitQuestions = allQuestions.sublist(startIndex, endIndex);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -597,28 +697,28 @@ class _UnitsTab extends StatelessWidget {
         elevation: 4,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            final result = await Navigator.push<double>(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    UnitQuestionsScreen(title: title, questions: questions),
+                builder: (_) => UnitQuestionsScreen(
+                  title: title,
+                  questions: unitQuestions,
+                  startIndex: startIndex,
+                  endIndex: endIndex,
+                ),
               ),
             );
+            if (result != null) _updateProgress(title, result);
           },
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top row: icon + title + chevron
                 Row(
                   children: [
-                    Image.asset(
-                      "assets/icons/unit_button_icon.png",
-                      width: 28,
-                      height: 28,
-                    ),
+                    Image.asset("assets/icons/unit_button_icon.png", width: 28, height: 28),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -626,37 +726,28 @@ class _UnitsTab extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF878C9F), // greyish color
+                          color: Color(0xFF878C9F),
                         ),
                       ),
                     ),
                     const Icon(Icons.chevron_right, color: Colors.black54),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // Bottom row: no. of questions + progress bar
                 Row(
                   children: [
-                    Text(
-                      "$questionCount Questions",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                    ),
+                    Text("$count Questions",
+                        style: const TextStyle(fontSize: 14, color: Colors.black87)),
                     const SizedBox(width: 16),
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: LinearProgressIndicator(
-                          value: 0.0, // TODO: bind to actual progress
+                          value: progress,
                           minHeight: 10,
                           backgroundColor: const Color(0xFFD9D9D9),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Colors.blue,
-                          ),
+                          valueColor:
+                          const AlwaysStoppedAnimation<Color>(Color(0xFF64B2EF)),
                         ),
                       ),
                     ),
@@ -671,17 +762,25 @@ class _UnitsTab extends StatelessWidget {
   }
 }
 
-/// ----------------------
-/// Unit Questions Screen
-/// ----------------------
+
+
+// =====================
+// Unit Questions Screen
+// =====================
+
+
 class UnitQuestionsScreen extends StatefulWidget {
   final String title;
   final List<dynamic> questions;
+  final int startIndex;
+  final int endIndex;
 
   const UnitQuestionsScreen({
     super.key,
     required this.title,
     required this.questions,
+    required this.startIndex,
+    required this.endIndex,
   });
 
   @override
@@ -689,151 +788,364 @@ class UnitQuestionsScreen extends StatefulWidget {
 }
 
 class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
-  late final PageController _pageController;
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-  }
+  int _currentIndex = 0;
+  int _correctCount = 0;
+  int _wrongCount = 0;
+  bool _showAnswer = false;
+  bool _isArabicExpanded = false; // collapsed by default
+  final FlutterTts _flutterTts = FlutterTts();
+  int? _selectedAnswerId;
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _flutterTts.stop();
     super.dispose();
+  }
+
+  void _speakQuestion(Map<String, dynamic> question) async {
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: AwesomeSnackbarContent(
+        title: 'Text to Speech',
+        message: 'Commencing text-to-speech for this question...',
+        contentType: ContentType.help,
+      ),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+
+    final text = StringBuffer();
+    text.writeln(question["questionText"]);
+    for (var ans in question["answers"]) {
+      text.writeln(ans["answerText"]);
+    }
+
+    await _flutterTts.setLanguage("en-US");
+    await _flutterTts.speak(text.toString());
+  }
+
+  void _speakArabic(Map<String, dynamic> question) async {
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: AwesomeSnackbarContent(
+        title: 'قراءة بالعربية',
+        message: 'تشغيل الصوت للنص العربي...',
+        contentType: ContentType.help,
+      ),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+
+    final text = StringBuffer();
+    text.writeln(question["questionTextAr"]);
+    for (var ans in question["answers"]) {
+      text.writeln(ans["answerTextAr"]);
+    }
+
+    await _flutterTts.setLanguage("ar-SA");
+    await _flutterTts.speak(text.toString());
+  }
+
+  void _submitAnswer(Map<String, dynamic> question) {
+    final correctAnswerId = question["questionId"]; // questionId = correct answer id
+    if (_selectedAnswerId == null) return;
+
+    setState(() {
+      _showAnswer = true;
+      if (_selectedAnswerId == correctAnswerId) {
+        _correctCount++;
+      } else {
+        _wrongCount++;
+      }
+    });
+  }
+
+  void _nextQuestion() {
+    if (_currentIndex < widget.questions.length - 1) {
+      setState(() {
+        _currentIndex++;
+        _selectedAnswerId = null;
+        _showAnswer = false;
+      });
+    } else {
+      final progress = (_currentIndex + 1) / widget.questions.length;
+      Navigator.pop(context, progress);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: BlocBuilder<ExamCubit, ExamState>(
-        builder: (context, examState) {
-          if (examState is! ExamLoaded) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    final question = widget.questions[_currentIndex];
+    final answers = question["answers"] as List<dynamic>;
 
-          final questions = widget.questions;
+    return WillPopScope(
+      onWillPop: () async {
+        final progress = (_currentIndex + 1) / widget.questions.length;
+        Navigator.pop(context, progress);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title,
+              style: GoogleFonts.robotoSlab(
+                  fontWeight: FontWeight.w600, fontSize: 16)),
+          backgroundColor: Colors.blue[700],
+        ),
+        backgroundColor: const Color(0xFFF9FAFC),
+        body: Column(
+          children: [
+            _headerStatusBox(), // header with counts
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    // English Question Card
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(question["questionText"],
+                                style: GoogleFonts.robotoSlab(
+                                    fontSize: 18, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 12),
+                            ...answers.map((ans) {
+                              final isSelected =
+                                  _selectedAnswerId == ans["answerId"];
+                              final isCorrect =
+                                  _showAnswer && ans["answerId"] == question["questionId"];
+                              final isWrong =
+                                  _showAnswer && isSelected && !isCorrect;
 
-          return PageView.builder(
-            controller: _pageController,
-            itemCount: questions.length,
-            itemBuilder: (context, index) {
-              final q = questions[index] as Map<String, dynamic>;
-              final answers = q["answers"] as List<dynamic>;
-              final questionId = q["questionId"];
-
-              return Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // English question
-                        Text(
-                          "Q${index + 1}: ${q['questionText']}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                              return GestureDetector(
+                                onTap: !_showAnswer
+                                    ? () => setState(() {
+                                  _selectedAnswerId = ans["answerId"];
+                                })
+                                    : null,
+                                child: Container(
+                                  margin:
+                                  const EdgeInsets.symmetric(vertical: 6),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isCorrect
+                                        ? Colors.green[100]
+                                        : isWrong
+                                        ? Colors.red[100]
+                                        : isSelected
+                                        ? Colors.blue[100]
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isCorrect
+                                          ? Colors.green
+                                          : isWrong
+                                          ? Colors.red
+                                          : Colors.grey[300]!,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    ans["answerText"],
+                                    style:
+                                    GoogleFonts.robotoSlab(fontSize: 16),
+                                  ),
+                                ),
+                              );
+                            }),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                ElevatedButton.icon(
+                                  onPressed: () => _speakQuestion(question),
+                                  icon: const Icon(Icons.volume_up),
+                                  label: const Text("Read"),
+                                ),
+                                SizedBox(
+                                  width: 160,
+                                  height: 46,
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                      const Color(0xFF64B2EF), // blue
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: _showAnswer
+                                        ? _nextQuestion
+                                        : () => _submitAnswer(question),
+                                    child: Text(
+                                      _showAnswer ? "Next" : "Submit",
+                                      style: GoogleFonts.robotoSlab(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 6),
+                      ),
+                    ),
 
-                        // Arabic question
-                        Text(
-                          q["questionTextAr"] ?? "",
-                          textDirection: TextDirection.rtl,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        const Divider(height: 20),
+                    const SizedBox(height: 12),
 
-                        // Answers
-                        ...answers.map((ans) {
-                          final answerId = ans["answerId"];
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              RadioListTile<int>(
-                                title: Text(ans["answerText"]),
-                                value: answerId,
-                                groupValue: examState.selectedAnswers[questionId],
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    context.read<ExamCubit>().selectAnswer(questionId, val);
-                                  }
-                                },
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 50, bottom: 8),
-                                child: Text(
-                                  ans["answerTextAr"] ?? "",
-                                  textDirection: TextDirection.rtl,
-                                  style: const TextStyle(fontSize: 14, color: Colors.black54),
+                    // Arabic Card (collapsible with read button)
+                    Card(
+                      elevation: 4,
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.volume_up_rounded,
+                                      color: Color(0xFF64B2EF)),
+                                  onPressed: () => _speakArabic(question),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    "العربية",
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.robotoSlab(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: AnimatedRotation(
+                                    turns: _isArabicExpanded ? 0.5 : 0.0,
+                                    duration:
+                                    const Duration(milliseconds: 200),
+                                    child: const Icon(
+                                        Icons.keyboard_arrow_down_rounded),
+                                  ),
+                                  onPressed: () {
+                                    setState(() => _isArabicExpanded =
+                                    !_isArabicExpanded);
+                                  },
+                                ),
+                              ],
+                            ),
+                            AnimatedCrossFade(
+                              crossFadeState: _isArabicExpanded
+                                  ? CrossFadeState.showSecond
+                                  : CrossFadeState.showFirst,
+                              duration: const Duration(milliseconds: 200),
+                              firstChild: const SizedBox.shrink(),
+                              secondChild: Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      question["questionTextAr"],
+                                      textDirection: TextDirection.rtl,
+                                      style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    const Divider(height: 20),
+                                    ...answers.map(
+                                          (ans) => Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 6),
+                                        child: Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Text(
+                                            ans["answerTextAr"],
+                                            textDirection: TextDirection.rtl,
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.black54),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          );
-                        }),
-
-                        const Spacer(),
-
-                        // Submit Button
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final authState = context.read<AuthCubit>().state;
-                              final isGuest = authState is AuthGuest;
-
-                              if (isGuest) {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text("Register to access this feature"),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(ctx); // close dialog
-                                          Navigator.pushReplacement(
-                                            context,
-                                            MaterialPageRoute(builder: (_) => const SplashScreen()),
-                                          );
-                                        },
-                                        child: const Text("OK"),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } else {
-                                // TODO: Send JSON request here
-                                // await context.read<ExamCubit>().submitAnswer(questionId);
-
-                                // Go to next question
-                                if (index < questions.length - 1) {
-                                  _pageController.jumpToPage(index + 1);
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text("You have completed this unit!")),
-                                  );
-                                }
-                              }
-                            },
-                            child: const Text("Submit"),
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              );
-            },
-          );
-        },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Status header
+  Widget _headerStatusBox() {
+    final progress = (_currentIndex + 1) / widget.questions.length;
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            "Q${_currentIndex + 1}/${widget.questions.length}",
+            style: GoogleFonts.robotoSlab(fontWeight: FontWeight.bold),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 10,
+                  backgroundColor: const Color(0xFFD9D9D9),
+                  valueColor:
+                  const AlwaysStoppedAnimation<Color>(Color(0xFF64B2EF)),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Text("✓ $_correctCount",
+                  style:
+                  GoogleFonts.robotoSlab(color: Colors.green[700])),
+              const SizedBox(width: 10),
+              Text("✕ $_wrongCount",
+                  style: GoogleFonts.robotoSlab(color: Colors.red[700])),
+            ],
+          ),
+        ],
       ),
     );
   }
