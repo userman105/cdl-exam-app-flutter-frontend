@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -652,9 +654,26 @@ class _UnitsTab extends StatefulWidget {
 
 class _UnitsTabState extends State<_UnitsTab> {
   final Map<String, double> _unitProgress = {};
+  Map<String, dynamic>? _previousMistakesExam;
 
   void _updateProgress(String title, double progress) {
     setState(() => _unitProgress[title] = progress);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreviousMistakesExam();
+  }
+
+  Future<void> _loadPreviousMistakesExam() async {
+    final examCubit = context.read<ExamCubit>();
+    final mistakesExam = await examCubit.loadPreviousMistakesExam();
+    if (mounted && mistakesExam != null) {
+      setState(() {
+        _previousMistakesExam = mistakesExam;
+      });
+    }
   }
 
   @override
@@ -670,18 +689,24 @@ class _UnitsTabState extends State<_UnitsTab> {
 
         return Padding(
           padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              _buildUnitButton(context, "Unit 1 (Q1–30)", questions, 0, 30.clamp(0, total)),
-              const SizedBox(height: 20),
-              _buildUnitButton(context, "Unit 2 (Q31–60)", questions, 30, 64.clamp(0, total)),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildUnitButton(context, "Basics", questions, 0, 30.clamp(0, total)),
+                const SizedBox(height: 20),
+                _buildUnitButton(context, "CDL trailers", questions, 30, 64.clamp(0, total)),
+                const SizedBox(height: 20),
+                if (_previousMistakesExam != null)
+                  _buildPreviousMistakesButton(context, _previousMistakesExam!),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
+  // Normal unit button builder (unchanged)
   Widget _buildUnitButton(
       BuildContext context,
       String title,
@@ -752,8 +777,87 @@ class _UnitsTabState extends State<_UnitsTab> {
                           value: progress,
                           minHeight: 10,
                           backgroundColor: const Color(0xFFD9D9D9),
-                          valueColor:
-                          const AlwaysStoppedAnimation<Color>(Color(0xFF64B2EF)),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF64B2EF)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Special button for “Previous Mistakes”
+  Widget _buildPreviousMistakesButton(BuildContext context, Map<String, dynamic> mistakesExam) {
+    final title = mistakesExam["title"] ?? "Previous Mistakes";
+    final questions = (mistakesExam["questions"] ?? []) as List<dynamic>;
+    final count = questions.length;
+    final progress = _unitProgress[title] ?? 0.0;
+
+    if (count == 0) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Material(
+        color: const Color(0xFFF9F9FF),
+        borderRadius: BorderRadius.circular(16),
+        elevation: 4,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            final result = await Navigator.push<double>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UnitQuestionsScreen(
+                  title: title,
+                  questions: questions,
+                  startIndex: 0,
+                  endIndex: count,
+                ),
+              ),
+            );
+            if (result != null) _updateProgress(title, result);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Color(0xFFEF6461), size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFEF6461),
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.black54),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text("$count Questions",
+                        style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 10,
+                          backgroundColor: const Color(0xFFD9D9D9),
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFEF6461)),
                         ),
                       ),
                     ),
@@ -767,6 +871,7 @@ class _UnitsTabState extends State<_UnitsTab> {
     );
   }
 }
+
 
 
 
@@ -798,9 +903,12 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
   int _correctCount = 0;
   int _wrongCount = 0;
   bool _showAnswer = false;
-  bool _isArabicExpanded = false; // collapsed by default
+  bool _isArabicExpanded = false;
   final FlutterTts _flutterTts = FlutterTts();
   int? _selectedAnswerId;
+
+  // 🔹 Static list to store all mistakes globally
+  static List<Map<String, dynamic>> _mistakeCache = [];
 
   @override
   void dispose() {
@@ -808,6 +916,49 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     super.dispose();
   }
 
+  // 🔹 Save mistakes persistently
+  Future<void> _saveMistakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("previous_mistakes", jsonEncode(_mistakeCache));
+  }
+
+  // 🔹 Load mistakes (optional if you want to persist across sessions)
+  static Future<void> loadMistakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString("previous_mistakes");
+    if (stored != null) {
+      _mistakeCache = List<Map<String, dynamic>>.from(jsonDecode(stored));
+    }
+  }
+
+  // 🔹 Add a new mistake safely
+  Future<void> _recordMistake(Map<String, dynamic> question) async {
+    final exists = _mistakeCache.any((q) => q["questionId"] == question["questionId"]);
+    if (!exists) {
+      _mistakeCache.add(question);
+      if (_mistakeCache.length > 64) {
+        _mistakeCache = _mistakeCache.sublist(_mistakeCache.length - 64); // keep last 64
+      }
+      await _saveMistakes();
+
+      if (_mistakeCache.length >= 10) {
+        _createMistakeExam();
+      }
+    }
+  }
+
+  // 🔹 Create the “Previous Mistakes” exam
+  Future<void> _createMistakeExam() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mistakeExam = {
+      "title": "Previous Mistakes",
+      "questions": _mistakeCache,
+      "total": _mistakeCache.length,
+    };
+    await prefs.setString("exam_previous_mistakes", jsonEncode(mistakeExam));
+  }
+
+  // 🔹 English TTS
   void _speakQuestion(Map<String, dynamic> question) async {
     final snackBar = SnackBar(
       elevation: 0,
@@ -831,6 +982,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     await _flutterTts.speak(text.toString());
   }
 
+  // 🔹 Arabic TTS
   void _speakArabic(Map<String, dynamic> question) async {
     final snackBar = SnackBar(
       elevation: 0,
@@ -854,8 +1006,9 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     await _flutterTts.speak(text.toString());
   }
 
-  void _submitAnswer(Map<String, dynamic> question) {
-    final correctAnswerId = question["questionId"]; // questionId = correct answer id
+  // 🔹 Submit answer
+  void _submitAnswer(Map<String, dynamic> question) async {
+    final correctAnswerId = question["questionId"];
     if (_selectedAnswerId == null) return;
 
     setState(() {
@@ -866,8 +1019,14 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
         _wrongCount++;
       }
     });
+
+    // Record mistake if wrong
+    if (_selectedAnswerId != correctAnswerId) {
+      await _recordMistake(question);
+    }
   }
 
+  // 🔹 Move to next question
   void _nextQuestion() {
     if (_currentIndex < widget.questions.length - 1) {
       setState(() {
@@ -902,199 +1061,15 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
         backgroundColor: const Color(0xFFF9FAFC),
         body: Column(
           children: [
-            _headerStatusBox(), // header with counts
+            _headerStatusBox(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // English Question Card
-                    Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(question["questionText"],
-                                style: GoogleFonts.robotoSlab(
-                                    fontSize: 18, fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 12),
-                            ...answers.map((ans) {
-                              final isSelected =
-                                  _selectedAnswerId == ans["answerId"];
-                              final isCorrect =
-                                  _showAnswer && ans["answerId"] == question["questionId"];
-                              final isWrong =
-                                  _showAnswer && isSelected && !isCorrect;
-
-                              return GestureDetector(
-                                onTap: !_showAnswer
-                                    ? () => setState(() {
-                                  _selectedAnswerId = ans["answerId"];
-                                })
-                                    : null,
-                                child: Container(
-                                  margin:
-                                  const EdgeInsets.symmetric(vertical: 6),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isCorrect
-                                        ? Colors.green[100]
-                                        : isWrong
-                                        ? Colors.red[100]
-                                        : isSelected
-                                        ? Colors.blue[100]
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isCorrect
-                                          ? Colors.green
-                                          : isWrong
-                                          ? Colors.red
-                                          : Colors.grey[300]!,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    ans["answerText"],
-                                    style:
-                                    GoogleFonts.robotoSlab(fontSize: 16),
-                                  ),
-                                ),
-                              );
-                            }),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed: () => _speakQuestion(question),
-                                  icon: const Icon(Icons.volume_up),
-                                  label: const Text("Read"),
-                                ),
-                                SizedBox(
-                                  width: 160,
-                                  height: 46,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                      const Color(0xFF64B2EF), // blue
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                    onPressed: _showAnswer
-                                        ? _nextQuestion
-                                        : () => _submitAnswer(question),
-                                    child: Text(
-                                      _showAnswer ? "Next" : "Submit",
-                                      style: GoogleFonts.robotoSlab(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
+                    _buildEnglishCard(question, answers),
                     const SizedBox(height: 12),
-
-                    // Arabic Card (collapsible with read button)
-                    Card(
-                      elevation: 4,
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.volume_up_rounded,
-                                      color: Color(0xFF64B2EF)),
-                                  onPressed: () => _speakArabic(question),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    "العربية",
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.robotoSlab(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: AnimatedRotation(
-                                    turns: _isArabicExpanded ? 0.5 : 0.0,
-                                    duration:
-                                    const Duration(milliseconds: 200),
-                                    child: const Icon(
-                                        Icons.keyboard_arrow_down_rounded),
-                                  ),
-                                  onPressed: () {
-                                    setState(() => _isArabicExpanded =
-                                    !_isArabicExpanded);
-                                  },
-                                ),
-                              ],
-                            ),
-                            AnimatedCrossFade(
-                              crossFadeState: _isArabicExpanded
-                                  ? CrossFadeState.showSecond
-                                  : CrossFadeState.showFirst,
-                              duration: const Duration(milliseconds: 200),
-                              firstChild: const SizedBox.shrink(),
-                              secondChild: Padding(
-                                padding: const EdgeInsets.only(top: 10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      question["questionTextAr"],
-                                      textDirection: TextDirection.rtl,
-                                      style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    const Divider(height: 20),
-                                    ...answers.map(
-                                          (ans) => Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 6),
-                                        child: Align(
-                                          alignment: Alignment.centerRight,
-                                          child: Text(
-                                            ans["answerTextAr"],
-                                            textDirection: TextDirection.rtl,
-                                            style: const TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.black54),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    _buildArabicCard(question, answers),
                   ],
                 ),
               ),
@@ -1105,7 +1080,172 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     );
   }
 
-  /// Status header
+  // 🔹 Build English Question Card
+  Widget _buildEnglishCard(Map<String, dynamic> question, List<dynamic> answers) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(question["questionText"],
+                style: GoogleFonts.robotoSlab(
+                    fontSize: 18, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ...answers.map((ans) {
+              final isSelected = _selectedAnswerId == ans["answerId"];
+              final isCorrect = _showAnswer && ans["answerId"] == question["questionId"];
+              final isWrong = _showAnswer && isSelected && !isCorrect;
+
+              return GestureDetector(
+                onTap: !_showAnswer
+                    ? () => setState(() => _selectedAnswerId = ans["answerId"])
+                    : null,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isCorrect
+                        ? Colors.green[100]
+                        : isWrong
+                        ? Colors.red[100]
+                        : isSelected
+                        ? Colors.blue[100]
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isCorrect
+                          ? Colors.green
+                          : isWrong
+                          ? Colors.red
+                          : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Text(ans["answerText"],
+                      style: GoogleFonts.robotoSlab(fontSize: 16)),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _speakQuestion(question),
+                  icon: const Icon(Icons.volume_up),
+                  label: const Text("Read"),
+                ),
+                SizedBox(
+                  width: 160,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF64B2EF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _showAnswer
+                        ? _nextQuestion
+                        : () => _submitAnswer(question),
+                    child: Text(
+                      _showAnswer ? "Next" : "Submit",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🔹 Build Arabic Card
+  Widget _buildArabicCard(Map<String, dynamic> question, List<dynamic> answers) {
+    return Card(
+      elevation: 4,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.volume_up_rounded,
+                      color: Color(0xFF64B2EF)),
+                  onPressed: () => _speakArabic(question),
+                ),
+                Expanded(
+                  child: Text(
+                    "العربية",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.robotoSlab(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: AnimatedRotation(
+                    turns: _isArabicExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                  onPressed: () =>
+                      setState(() => _isArabicExpanded = !_isArabicExpanded),
+                ),
+              ],
+            ),
+            AnimatedCrossFade(
+              crossFadeState: _isArabicExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(question["questionTextAr"],
+                        textDirection: TextDirection.rtl,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Divider(height: 20),
+                    ...answers.map((ans) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(ans["answerTextAr"],
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.black54)),
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 🔹 Status header
   Widget _headerStatusBox() {
     final progress = (_currentIndex + 1) / widget.questions.length;
 
@@ -1144,8 +1284,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
           Row(
             children: [
               Text("✓ $_correctCount",
-                  style:
-                  GoogleFonts.robotoSlab(color: Colors.green[700])),
+                  style: GoogleFonts.robotoSlab(color: Colors.green[700])),
               const SizedBox(width: 10),
               Text("✕ $_wrongCount",
                   style: GoogleFonts.robotoSlab(color: Colors.red[700])),

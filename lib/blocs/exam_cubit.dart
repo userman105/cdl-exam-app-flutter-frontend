@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,6 +8,9 @@ part 'exam_state.dart';
 
 class ExamCubit extends Cubit<ExamState> {
   ExamCubit() : super(ExamInitial());
+
+  // Track wrong questions
+  final List<int> _wrongQuestionIds = [];
 
   Future<void> loadExam(BuildContext context, int examId) async {
     emit(ExamLoading());
@@ -19,7 +22,7 @@ class ExamCubit extends Cubit<ExamState> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // ✅ Cache exam data
+        // Cache the exam data
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString("exam_$examId", jsonEncode(data));
 
@@ -37,11 +40,11 @@ class ExamCubit extends Cubit<ExamState> {
           final data = jsonDecode(cached);
           emit(ExamLoaded(examData: data, selectedAnswers: {}));
 
-          // Show snackbar if UI context provided
+          // Show a snackbar when loaded from cache
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text("Loaded from cache "),
+                content: const Text("Loaded exam from cache"),
                 backgroundColor: Colors.orange[700],
                 behavior: SnackBarBehavior.floating,
               ),
@@ -56,6 +59,7 @@ class ExamCubit extends Cubit<ExamState> {
     }
   }
 
+  /// Selects an answer for a question
   void selectAnswer(int questionId, int answerId) {
     if (state is ExamLoaded) {
       final current = state as ExamLoaded;
@@ -63,5 +67,57 @@ class ExamCubit extends Cubit<ExamState> {
       updatedAnswers[questionId] = answerId;
       emit(current.copyWith(selectedAnswers: updatedAnswers));
     }
+  }
+
+  /// Called when a question is answered to track mistakes
+  Future<void> markAnswerResult(Map<String, dynamic> question, bool isCorrect) async {
+    final questionId = question["questionId"] as int;
+
+    if (!isCorrect && !_wrongQuestionIds.contains(questionId)) {
+      _wrongQuestionIds.add(questionId);
+    }
+
+    // Create "Previous Mistakes" exam when user hits 10 wrong answers
+    if (_wrongQuestionIds.length == 10) {
+      await _createMistakesExam();
+    }
+  }
+
+  /// Builds and saves the "Previous Mistakes" exam (max 64 questions)
+  Future<void> _createMistakesExam() async {
+    if (state is! ExamLoaded) return;
+    final current = state as ExamLoaded;
+    final allQuestions = current.examData["questions"] as List;
+
+    final mistakeQuestions = allQuestions
+        .where((q) => _wrongQuestionIds.contains(q["questionId"]))
+        .take(64)
+        .toList();
+
+    final mistakesExam = {
+      "id": "mistakes_${DateTime.now().millisecondsSinceEpoch}",
+      "title": "Previous Mistakes",
+      "questions": mistakeQuestions,
+    };
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("exam_previous_mistakes", jsonEncode(mistakesExam));
+
+    debugPrint(" Created 'Previous Mistakes' exam with ${mistakeQuestions.length} questions");
+  }
+
+  /// Loads the saved "Previous Mistakes" exam (if exists)
+  Future<Map<String, dynamic>?> loadPreviousMistakesExam() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString("exam_previous_mistakes");
+    if (saved != null) {
+      return jsonDecode(saved);
+    }
+    return null;
+  }
+
+  /// Clears all recorded mistakes (optional helper)
+  void clearMistakes() {
+    _wrongQuestionIds.clear();
   }
 }
