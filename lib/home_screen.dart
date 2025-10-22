@@ -147,7 +147,8 @@ class HomeScreen extends StatelessWidget {
                     iconPath: "assets/icons/tractors_and_trailers.svg",
                     onTap: () async {
                       final examCubit = context.read<ExamCubit>();
-                      await examCubit.loadExam(1);
+                      await examCubit.loadExam(context, 1);
+
 
                       final state = examCubit.state;
                       if (state is ExamLoaded) {

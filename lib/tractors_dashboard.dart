@@ -251,9 +251,11 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
         if (state is ExamLoading) {
           return const Center(child: CircularProgressIndicator());
         }
+
         if (state is ExamError) {
           return Center(child: Text("Error: ${state.message}"));
         }
+
         if (state is ExamLoaded) {
           final questions = state.examData["questions"] as List<dynamic>;
 
@@ -270,7 +272,12 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
                   },
                   itemCount: questions.length,
                   itemBuilder: (context, index) {
-                    return _buildQuestionPage(context, questions, index, state);
+                    return _buildQuestionPage(
+                      context,
+                      questions,
+                      index,
+                      state,
+                    );
                   },
                 ),
               ),
@@ -278,6 +285,7 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
             ],
           );
         }
+
         return const Center(child: Text("No exam loaded"));
       },
     );
@@ -666,9 +674,7 @@ class _UnitsTabState extends State<_UnitsTab> {
             children: [
               _buildUnitButton(context, "Unit 1 (Q1–30)", questions, 0, 30.clamp(0, total)),
               const SizedBox(height: 20),
-              _buildUnitButton(context, "Unit 2 (Q31–60)", questions, 30, 60.clamp(0, total)),
-              const SizedBox(height: 20),
-              _buildUnitButton(context, "Unit 3 (Q61–$total)", questions, 60, total),
+              _buildUnitButton(context, "Unit 2 (Q31–60)", questions, 30, 64.clamp(0, total)),
             ],
           ),
         );
