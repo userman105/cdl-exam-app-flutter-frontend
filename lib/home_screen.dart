@@ -146,25 +146,53 @@ class HomeScreen extends StatelessWidget {
                   _buildButton(
                     label: "Tractors and trailers",
                     iconPath: "assets/icons/tractors_and_trailers.svg",
-                    onTap: () async {
-                      final examCubit = context.read<ExamCubit>();
-                      await examCubit.loadExam(context, 1);
+                      onTap: () async {
+                        final examCubit = context.read<ExamCubit>();
 
-
-                      final state = examCubit.state;
-                      if (state is ExamLoaded) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TractorsDashboard(),
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child: SizedBox(
+                              width: 80,
+                              height: 80,
+                              child: Card(
+                                color: Colors.white,
+                                elevation: 6,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: CircularProgressIndicator(color: Colors.blue),
+                                ),
+                              ),
+                            ),
                           ),
                         );
-                      } else if (state is ExamError) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(state.message)),
-                        );
-                      }
-                    },
+
+                        try {
+                          await examCubit.loadExam(context, 1);
+                          final state = examCubit.state;
+
+                          Navigator.of(context).pop();
+
+                          if (state is ExamLoaded) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => TractorsDashboard(initialTabIndex: 1)),
+                            );
+                          } else if (state is ExamError) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(state.message)),
+                            );
+                          }
+                        } catch (e) {
+                          Navigator.of(context).pop(); // Close spinner if error happens
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Failed to load exam: $e")),
+                          );
+                        }
+                      },
+
                   ),
                   const SizedBox(height: 200),
 

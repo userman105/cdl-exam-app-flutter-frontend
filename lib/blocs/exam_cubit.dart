@@ -83,7 +83,7 @@ class ExamCubit extends Cubit<ExamState> {
     }
   }
 
-  /// Builds and saves the "Previous Mistakes" exam (max 64 questions)
+
   Future<void> _createMistakesExam() async {
     if (state is! ExamLoaded) return;
     final current = state as ExamLoaded;

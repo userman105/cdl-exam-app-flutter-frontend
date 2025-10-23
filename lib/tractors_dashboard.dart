@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:convert';
-
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'report_card.dart';
 import 'blocs/exam_cubit.dart';
 
 
@@ -48,7 +48,9 @@ Future<void> speak(
 // Main Dashboard
 // =====================
 class TractorsDashboard extends StatefulWidget {
-  const TractorsDashboard({super.key});
+  final int initialTabIndex;
+
+  const TractorsDashboard({super.key, this.initialTabIndex = 0});
 
   @override
   State<TractorsDashboard> createState() => _TractorsDashboardState();
@@ -66,10 +68,16 @@ class _TractorsDashboardState extends State<TractorsDashboard>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
+
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+
     _loadHeaderProgress();
   }
 
@@ -83,9 +91,7 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getInt('progress_A Real Exam') ?? 0;
 
-    setState(() {
-      _unitCurrentIndex = saved;
-    });
+    setState(() => _unitCurrentIndex = saved);
 
     final examState = context.read<ExamCubit>().state;
     if (examState is ExamLoaded) {
@@ -94,8 +100,8 @@ class _TractorsDashboardState extends State<TractorsDashboard>
       _unitTotal = unit1.length;
 
       final selectedMap = examState.selectedAnswers;
-      var correct = 0;
-      var wrong = 0;
+      int correct = 0;
+      int wrong = 0;
 
       for (var q in unit1) {
         final qid = q['questionId'];
@@ -134,11 +140,11 @@ class _TractorsDashboardState extends State<TractorsDashboard>
             IconButton(
               icon: Image.asset(
                 "assets/icons/subscription.png",
-                width: 134,
-                height: 134,
+                width: 132,
+                height: 132,
               ),
               onPressed: () {
-                // TODO: Implement subscription functionality
+                // TODO: Implement subscription action
               },
             ),
           ],
@@ -146,7 +152,7 @@ class _TractorsDashboardState extends State<TractorsDashboard>
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top border shadow
+            // Header divider shadow
             Container(
               height: 1,
               decoration: BoxDecoration(
@@ -161,7 +167,7 @@ class _TractorsDashboardState extends State<TractorsDashboard>
               ),
             ),
 
-            // Tab buttons row
+            // Tabs row
             Padding(
               padding: const EdgeInsets.all(12.0),
               child: Row(
@@ -185,8 +191,8 @@ class _TractorsDashboardState extends State<TractorsDashboard>
               child: TabBarView(
                 controller: _tabController,
                 children: const [
-                  _QuestionsBankTab(),
-                  _UnitsTab(),
+                  QuestionsBankTab(),
+                  UnitsTab(),
                 ],
               ),
             ),
@@ -206,8 +212,8 @@ class _TractorsDashboardState extends State<TractorsDashboard>
           onPressed: () => _tabController.animateTo(index),
           child: Text(
             text,
-            style: const TextStyle(
-              color: Colors.black,
+            style: TextStyle(
+              color: isActive ? Colors.black : Colors.black54,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -227,14 +233,14 @@ class _TractorsDashboardState extends State<TractorsDashboard>
 // =====================
 // Questions Bank Tab
 // =====================
-class _QuestionsBankTab extends StatefulWidget {
-  const _QuestionsBankTab();
+class QuestionsBankTab extends StatefulWidget {
+  const QuestionsBankTab();
 
   @override
-  State<_QuestionsBankTab> createState() => _QuestionsBankTabState();
+  State<QuestionsBankTab> createState() => _QuestionsBankTabState();
 }
 
-class _QuestionsBankTabState extends State<_QuestionsBankTab> {
+class _QuestionsBankTabState extends State<QuestionsBankTab> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _showAnswer = false;
@@ -645,14 +651,14 @@ class _QuestionsBankTabState extends State<_QuestionsBankTab> {
 // =====================
 // Units Tab
 // =====================
-class _UnitsTab extends StatefulWidget {
-  const _UnitsTab();
+class UnitsTab extends StatefulWidget {
+  const UnitsTab();
 
   @override
-  State<_UnitsTab> createState() => _UnitsTabState();
+  State<UnitsTab> createState() => _UnitsTabState();
 }
 
-class _UnitsTabState extends State<_UnitsTab> {
+class _UnitsTabState extends State<UnitsTab> {
   final Map<String, double> _unitProgress = {};
   Map<String, dynamic>? _previousMistakesExam;
 
@@ -696,6 +702,7 @@ class _UnitsTabState extends State<_UnitsTab> {
                 const SizedBox(height: 20),
                 _buildUnitButton(context, "CDL trailers", questions, 30, 64.clamp(0, total)),
                 const SizedBox(height: 20),
+                _buildUnitButton(context, "Time Attack", questions, 0, total, isTimeAttack: true),
                 if (_previousMistakesExam != null)
                   _buildPreviousMistakesButton(context, _previousMistakesExam!),
               ],
@@ -712,8 +719,9 @@ class _UnitsTabState extends State<_UnitsTab> {
       String title,
       List<dynamic> allQuestions,
       int startIndex,
-      int endIndex,
-      ) {
+      int endIndex, {
+        bool isTimeAttack = false,
+      }) {
     final count = endIndex - startIndex;
     if (count <= 0) return const SizedBox.shrink();
 
@@ -729,6 +737,53 @@ class _UnitsTabState extends State<_UnitsTab> {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
+            if (isTimeAttack) {
+              //  Show a short explanation before starting
+              final start = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  title: const Text("Time Attack Mode"),
+                  content: const Text(
+                    "You’ll have 10 seconds to answer each question.\n"
+                        "Ready to start?",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Cancel"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Start"),
+                    ),
+                  ],
+                ),
+              );
+
+              if (start != true) return;
+
+              //  Randomize 20 questions from allQuestions
+              final randomized = List<dynamic>.from(allQuestions)..shuffle();
+              final selected = randomized.take(30).toList();
+
+              await Navigator.push<double>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UnitQuestionsScreen(
+                    title: " Time Attack",
+                    questions: selected,
+                    startIndex: 0,
+                    endIndex: selected.length,
+                    isTimed: true,
+                  ),
+                ),
+              );
+              return;
+            }
+
+            // 🔹 Normal Unit Mode
             final result = await Navigator.push<double>(
               context,
               MaterialPageRoute(
@@ -749,7 +804,11 @@ class _UnitsTabState extends State<_UnitsTab> {
               children: [
                 Row(
                   children: [
-                    Image.asset("assets/icons/unit_button_icon.png", width: 28, height: 28),
+                    Image.asset(
+                      "assets/icons/unit_button_icon.png",
+                      width: 28,
+                      height: 28,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -767,17 +826,23 @@ class _UnitsTabState extends State<_UnitsTab> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Text("$count Questions",
-                        style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                    Text(
+                      isTimeAttack
+                          ? "30 Random Questions"
+                          : "$count Questions",
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.black87),
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: LinearProgressIndicator(
-                          value: progress,
+                          value: isTimeAttack ? 0 : progress,
                           minHeight: 10,
                           backgroundColor: const Color(0xFFD9D9D9),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF64B2EF)),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFF64B2EF)),
                         ),
                       ),
                     ),
@@ -791,7 +856,8 @@ class _UnitsTabState extends State<_UnitsTab> {
     );
   }
 
-  // ✅ Special button for “Previous Mistakes”
+
+  // Special button for “Previous Mistakes”
   Widget _buildPreviousMistakesButton(BuildContext context, Map<String, dynamic> mistakesExam) {
     final title = mistakesExam["title"] ?? "Previous Mistakes";
     final questions = (mistakesExam["questions"] ?? []) as List<dynamic>;
@@ -879,12 +945,12 @@ class _UnitsTabState extends State<_UnitsTab> {
 // Unit Questions Screen
 // =====================
 
-
 class UnitQuestionsScreen extends StatefulWidget {
   final String title;
   final List<dynamic> questions;
   final int startIndex;
   final int endIndex;
+  final bool isTimed; // 🔹 for Time Attack mode
 
   const UnitQuestionsScreen({
     super.key,
@@ -892,6 +958,7 @@ class UnitQuestionsScreen extends StatefulWidget {
     required this.questions,
     required this.startIndex,
     required this.endIndex,
+    this.isTimed = false,
   });
 
   @override
@@ -899,30 +966,39 @@ class UnitQuestionsScreen extends StatefulWidget {
 }
 
 class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
+  late DateTime _startTime;
   int _currentIndex = 0;
   int _correctCount = 0;
   int _wrongCount = 0;
   bool _showAnswer = false;
   bool _isArabicExpanded = false;
-  final FlutterTts _flutterTts = FlutterTts();
   int? _selectedAnswerId;
+  final FlutterTts _flutterTts = FlutterTts();
 
-  // 🔹 Static list to store all mistakes globally
   static List<Map<String, dynamic>> _mistakeCache = [];
+
+  Timer? _questionTimer;
+  int _remainingSeconds = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.now();
+    if (widget.isTimed) _startTimer(widget.questions[_currentIndex]);
+  }
 
   @override
   void dispose() {
     _flutterTts.stop();
+    _questionTimer?.cancel();
     super.dispose();
   }
 
-  // 🔹 Save mistakes persistently
   Future<void> _saveMistakes() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString("previous_mistakes", jsonEncode(_mistakeCache));
   }
 
-  // 🔹 Load mistakes (optional if you want to persist across sessions)
   static Future<void> loadMistakes() async {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString("previous_mistakes");
@@ -931,13 +1007,12 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     }
   }
 
-  // 🔹 Add a new mistake safely
   Future<void> _recordMistake(Map<String, dynamic> question) async {
     final exists = _mistakeCache.any((q) => q["questionId"] == question["questionId"]);
     if (!exists) {
       _mistakeCache.add(question);
       if (_mistakeCache.length > 64) {
-        _mistakeCache = _mistakeCache.sublist(_mistakeCache.length - 64); // keep last 64
+        _mistakeCache = _mistakeCache.sublist(_mistakeCache.length - 64);
       }
       await _saveMistakes();
 
@@ -947,7 +1022,6 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     }
   }
 
-  // 🔹 Create the “Previous Mistakes” exam
   Future<void> _createMistakeExam() async {
     final prefs = await SharedPreferences.getInstance();
     final mistakeExam = {
@@ -958,7 +1032,24 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     await prefs.setString("exam_previous_mistakes", jsonEncode(mistakeExam));
   }
 
-  // 🔹 English TTS
+  // 🔹 Timer logic for Time Attack mode
+  void _startTimer(Map<String, dynamic> question) {
+    if (!widget.isTimed) return;
+    _questionTimer?.cancel();
+    _remainingSeconds = 10;
+
+    _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
+        if (!_showAnswer) {
+          _submitAnswer(question); // auto-submit
+        }
+      } else {
+        setState(() => _remainingSeconds--);
+      }
+    });
+  }
+
   void _speakQuestion(Map<String, dynamic> question) async {
     final snackBar = SnackBar(
       elevation: 0,
@@ -982,7 +1073,6 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     await _flutterTts.speak(text.toString());
   }
 
-  // 🔹 Arabic TTS
   void _speakArabic(Map<String, dynamic> question) async {
     final snackBar = SnackBar(
       elevation: 0,
@@ -1006,7 +1096,6 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     await _flutterTts.speak(text.toString());
   }
 
-  // 🔹 Submit answer
   void _submitAnswer(Map<String, dynamic> question) async {
     final correctAnswerId = question["questionId"];
     if (_selectedAnswerId == null) return;
@@ -1020,25 +1109,42 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       }
     });
 
-    // Record mistake if wrong
+    _questionTimer?.cancel();
     if (_selectedAnswerId != correctAnswerId) {
       await _recordMistake(question);
     }
   }
 
-  // 🔹 Move to next question
-  void _nextQuestion() {
+  void _nextQuestion() async {
     if (_currentIndex < widget.questions.length - 1) {
       setState(() {
         _currentIndex++;
         _selectedAnswerId = null;
         _showAnswer = false;
       });
+      _startTimer(widget.questions[_currentIndex]);
     } else {
-      final progress = (_currentIndex + 1) / widget.questions.length;
+      _questionTimer?.cancel();
+      final totalTime = DateTime.now().difference(_startTime);
+      final totalQuestions = widget.questions.length;
+      final percentage = (_correctCount / totalQuestions) * 100;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ReportCard(
+          correctAnswers: _correctCount,
+          wrongAnswers: _wrongCount,
+          timeElapsed: totalTime,
+          percentage: percentage,
+        ),
+      );
+
+      final progress = (_currentIndex + 1) / totalQuestions;
       Navigator.pop(context, progress);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1054,8 +1160,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.title,
-              style: GoogleFonts.robotoSlab(
-                  fontWeight: FontWeight.w600, fontSize: 16)),
+              style: GoogleFonts.robotoSlab(fontWeight: FontWeight.w600, fontSize: 16)),
           backgroundColor: Colors.blue[700],
         ),
         backgroundColor: const Color(0xFFF9FAFC),
@@ -1080,7 +1185,6 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     );
   }
 
-  // 🔹 Build English Question Card
   Widget _buildEnglishCard(Map<String, dynamic> question, List<dynamic> answers) {
     return Card(
       elevation: 4,
@@ -1091,8 +1195,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(question["questionText"],
-                style: GoogleFonts.robotoSlab(
-                    fontSize: 18, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.robotoSlab(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             ...answers.map((ans) {
               final isSelected = _selectedAnswerId == ans["answerId"];
@@ -1168,7 +1271,6 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     );
   }
 
-  // 🔹 Build Arabic Card
   Widget _buildArabicCard(Map<String, dynamic> question, List<dynamic> answers) {
     return Card(
       elevation: 4,
@@ -1183,8 +1285,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.volume_up_rounded,
-                      color: Color(0xFF64B2EF)),
+                  icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF64B2EF)),
                   onPressed: () => _speakArabic(question),
                 ),
                 Expanded(
@@ -1204,8 +1305,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                     duration: const Duration(milliseconds: 200),
                     child: const Icon(Icons.keyboard_arrow_down_rounded),
                   ),
-                  onPressed: () =>
-                      setState(() => _isArabicExpanded = !_isArabicExpanded),
+                  onPressed: () => setState(() => _isArabicExpanded = !_isArabicExpanded),
                 ),
               ],
             ),
@@ -1245,7 +1345,6 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     );
   }
 
-  /// 🔹 Status header
   Widget _headerStatusBox() {
     final progress = (_currentIndex + 1) / widget.questions.length;
 
@@ -1262,10 +1361,23 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            "Q${_currentIndex + 1}/${widget.questions.length}",
-            style: GoogleFonts.robotoSlab(fontWeight: FontWeight.bold),
-          ),
+          Text("Q${_currentIndex + 1}/${widget.questions.length}",
+              style: GoogleFonts.robotoSlab(fontWeight: FontWeight.bold)),
+          if (widget.isTimed)
+            Row(
+              children: [
+                const Icon(Icons.timer, size: 18, color: Colors.redAccent),
+                const SizedBox(width: 4),
+                Text(
+                  '$_remainingSeconds s',
+                  style: GoogleFonts.robotoSlab(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+            ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
