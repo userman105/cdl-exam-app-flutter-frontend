@@ -22,7 +22,6 @@ class ExamCubit extends Cubit<ExamState> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // Cache the exam data
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString("exam_$examId", jsonEncode(data));
 
@@ -31,7 +30,6 @@ class ExamCubit extends Cubit<ExamState> {
         throw Exception("Failed to fetch exam: ${response.statusCode}");
       }
     } catch (e) {
-      // Try loading cached data
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString("exam_$examId");
 
@@ -40,7 +38,6 @@ class ExamCubit extends Cubit<ExamState> {
           final data = jsonDecode(cached);
           emit(ExamLoaded(examData: data, selectedAnswers: {}));
 
-          // Show a snackbar when loaded from cache
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -59,7 +56,6 @@ class ExamCubit extends Cubit<ExamState> {
     }
   }
 
-  /// Selects an answer for a question
   void selectAnswer(int questionId, int answerId) {
     if (state is ExamLoaded) {
       final current = state as ExamLoaded;
@@ -69,8 +65,8 @@ class ExamCubit extends Cubit<ExamState> {
     }
   }
 
-  /// Called when a question is answered to track mistakes
-  Future<void> markAnswerResult(Map<String, dynamic> question, bool isCorrect) async {
+  Future<void> markAnswerResult(
+      Map<String, dynamic> question, bool isCorrect) async {
     final questionId = question["questionId"] as int;
 
     if (!isCorrect && !_wrongQuestionIds.contains(questionId)) {
@@ -82,7 +78,6 @@ class ExamCubit extends Cubit<ExamState> {
       await _createMistakesExam();
     }
   }
-
 
   Future<void> _createMistakesExam() async {
     if (state is! ExamLoaded) return;
@@ -103,10 +98,9 @@ class ExamCubit extends Cubit<ExamState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString("exam_previous_mistakes", jsonEncode(mistakesExam));
 
-    debugPrint(" Created 'Previous Mistakes' exam with ${mistakeQuestions.length} questions");
+    debugPrint("✅ Created 'Previous Mistakes' exam with ${mistakeQuestions.length} questions");
   }
 
-  /// Loads the saved "Previous Mistakes" exam (if exists)
   Future<Map<String, dynamic>?> loadPreviousMistakesExam() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString("exam_previous_mistakes");
@@ -116,8 +110,38 @@ class ExamCubit extends Cubit<ExamState> {
     return null;
   }
 
-  /// Clears all recorded mistakes (optional helper)
   void clearMistakes() {
     _wrongQuestionIds.clear();
+  }
+
+  // 🆕 New: Remove correctly answered questions from the mistakes list
+  Future<void> updatePreviousMistakesAfterExam(
+      Map<int, int?> selectedAnswers, List<dynamic> allQuestions) async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString("exam_previous_mistakes");
+
+    if (saved == null) return;
+
+    final existing = jsonDecode(saved);
+    final questions = List<Map<String, dynamic>>.from(existing["questions"]);
+
+    // Keep only those that were NOT correctly answered in the recent exam
+    final updatedQuestions = questions.where((q) {
+      final qid = q["questionId"];
+      final selected = selectedAnswers[qid];
+      final correct = q["correctAnswer"];
+      return selected != correct;
+    }).toList();
+
+    final updatedExam = {
+      "id": existing["id"],
+      "title": "Previous Mistakes",
+      "questions": updatedQuestions,
+    };
+
+    await prefs.setString("exam_previous_mistakes", jsonEncode(updatedExam));
+
+    debugPrint(
+        "🧹 Cleaned 'Previous Mistakes' exam: now ${updatedQuestions.length} questions remain");
   }
 }

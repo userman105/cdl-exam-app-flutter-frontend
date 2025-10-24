@@ -674,13 +674,36 @@ class _UnitsTabState extends State<UnitsTab> {
 
   Future<void> _loadPreviousMistakesExam() async {
     final examCubit = context.read<ExamCubit>();
+
+    // Load the saved previous mistakes exam (if it exists)
     final mistakesExam = await examCubit.loadPreviousMistakesExam();
-    if (mounted && mistakesExam != null) {
+
+    if (!mounted) return;
+
+    if (mistakesExam != null) {
+      //  Automatically clean solved questions using the latest exam data
+      final state = examCubit.state;
+      if (state is ExamLoaded) {
+        await examCubit.updatePreviousMistakesAfterExam(
+          state.selectedAnswers,
+          state.examData["questions"] as List<dynamic>,
+        );
+      }
+
+      // Update the local state so UI can show it
       setState(() {
         _previousMistakesExam = mistakesExam;
       });
+
+      debugPrint(
+        " Loaded 'Previous Mistakes' exam with "
+            "${mistakesExam["questions"].length} questions.",
+      );
+    } else {
+      debugPrint("⚠No 'Previous Mistakes' exam found in storage.");
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
