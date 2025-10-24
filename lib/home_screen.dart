@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -7,10 +9,34 @@ import 'blocs/exam_cubit.dart';
 import 'tractors_dashboard.dart';
 import 'first_screen.dart';
 import 'profile_edit.dart';
-
+import 'airbrakes_dashboard.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  Future<void> _showSpinner(BuildContext context) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: SizedBox(
+          width: 80,
+          height: 80,
+          child: Card(
+            color: Colors.white,
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(16)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(color: Colors.blue),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<bool> _onWillPop(BuildContext context) async {
     final authState = context.read<AuthCubit>().state;
@@ -23,7 +49,6 @@ class HomeScreen extends StatelessWidget {
       );
       return false;
     }
-
 
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -55,6 +80,47 @@ class HomeScreen extends StatelessWidget {
 
     return false;
   }
+
+
+  Future<void> _loadExamAndNavigate({
+    required BuildContext context,
+    required int examId,
+    required Widget Function() destinationBuilder,
+  }) async {
+    final examCubit = context.read<ExamCubit>();
+
+    unawaited(_showSpinner(context));
+
+    try {
+      unawaited(examCubit.loadExam(context, examId));
+
+      final state = await examCubit.stream
+          .firstWhere((s) => s is ExamLoaded || s is ExamError)
+          .timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => ExamError("Exam loading timed out. Please try again."),
+      );
+
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (state is ExamLoaded) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => destinationBuilder()),
+        );
+      } else if (state is ExamError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(state.message)),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to load exam: $e")),
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -88,10 +154,7 @@ class HomeScreen extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.white,
-                          ],
+                          colors: [Colors.transparent, Colors.white],
                         ),
                       ),
                     ),
@@ -100,6 +163,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
+            // Profile button
             Positioned(
               top: 40,
               right: 20,
@@ -125,7 +189,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Buttons positioned at fade spot
+            // Buttons
             Align(
               alignment: const FractionalOffset(0.5, 0.85),
               child: Column(
@@ -140,62 +204,27 @@ class HomeScreen extends StatelessWidget {
                   _buildButton(
                     label: "Air brakes",
                     iconPath: "assets/icons/air_brakes.svg",
-                    onTap: () {},
+                    onTap: () => _loadExamAndNavigate(
+                      context: context,
+                      examId: 2,
+                      destinationBuilder: () =>
+                          AirbrakesDashboard(initialTabIndex: 1),
+                    ),
                   ),
                   const SizedBox(height: 40),
                   _buildButton(
                     label: "Tractors and trailers",
                     iconPath: "assets/icons/tractors_and_trailers.svg",
-                      onTap: () async {
-                        final examCubit = context.read<ExamCubit>();
-
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (context) => const Center(
-                            child: SizedBox(
-                              width: 80,
-                              height: 80,
-                              child: Card(
-                                color: Colors.white,
-                                elevation: 6,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-                                child: Padding(
-                                  padding: EdgeInsets.all(20.0),
-                                  child: CircularProgressIndicator(color: Colors.blue),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-
-                        try {
-                          await examCubit.loadExam(context, 1);
-                          final state = examCubit.state;
-
-                          Navigator.of(context).pop();
-
-                          if (state is ExamLoaded) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => TractorsDashboard(initialTabIndex: 1)),
-                            );
-                          } else if (state is ExamError) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(state.message)),
-                            );
-                          }
-                        } catch (e) {
-                          Navigator.of(context).pop(); // Close spinner if error happens
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("Failed to load exam: $e")),
-                          );
-                        }
-                      },
-
+                    onTap: () => _loadExamAndNavigate(
+                      context: context,
+                      examId: 1,
+                      destinationBuilder: () =>
+                          TractorsDashboard(initialTabIndex: 1),
+                    ),
                   ),
                   const SizedBox(height: 200),
 
+                  // Guest register prompt
                   BlocBuilder<AuthCubit, AuthState>(
                     builder: (context, state) {
                       if (state is AuthGuest) {
@@ -204,16 +233,20 @@ class HomeScreen extends StatelessWidget {
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const SplashScreen()),
+                                builder: (_) => const SplashScreen(),
+                              ),
                             );
                           },
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.blue, width: 1),
+                            side:
+                            const BorderSide(color: Colors.blue, width: 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 25, vertical: 15),
+                              horizontal: 25,
+                              vertical: 15,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -239,7 +272,7 @@ class HomeScreen extends StatelessWidget {
 
                       return const SizedBox.shrink();
                     },
-                  )
+                  ),
                 ],
               ),
             ),
@@ -273,11 +306,7 @@ class HomeScreen extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            SvgPicture.asset(
-              iconPath,
-              height: 50,
-              width: 50,
-            ),
+            SvgPicture.asset(iconPath, height: 50, width: 50),
             const SizedBox(width: 10),
             Text(
               label,

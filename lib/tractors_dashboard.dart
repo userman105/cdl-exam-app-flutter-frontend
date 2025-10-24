@@ -10,39 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'report_card.dart';
 import 'blocs/exam_cubit.dart';
 
+import 'widgets/widgets.dart';
+import 'constants/constants.dart';
 
-// =====================
-// Global TTS Instance
-// =====================
-final FlutterTts flutterTts = FlutterTts();
-
-Future<void> speak(
-    String text,
-    BuildContext context, {
-      String langCode = "en-US",
-    }) async {
-  try {
-    await flutterTts.setLanguage(langCode);
-    await flutterTts.setSpeechRate(0.5);
-    await flutterTts.speak(text);
-  } catch (e) {
-    debugPrint("TTS Error: $e");
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          behavior: SnackBarBehavior.floating,
-          content: AwesomeSnackbarContent(
-            title: 'TTS Error',
-            message: 'Unable to play text-to-speech.',
-            contentType: ContentType.failure,
-          ),
-        ),
-      );
-    }
-  }
-}
 
 // =====================
 // Main Dashboard
@@ -60,11 +30,6 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  int _unitCurrentIndex = 0;
-  int _unitTotal = 0;
-  int _correctCount = 0;
-  int _wrongCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -73,12 +38,9 @@ class _TractorsDashboardState extends State<TractorsDashboard>
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
-
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
-
-    _loadHeaderProgress();
   }
 
   @override
@@ -87,145 +49,80 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     super.dispose();
   }
 
-  Future<void> _loadHeaderProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getInt('progress_A Real Exam') ?? 0;
-
-    setState(() => _unitCurrentIndex = saved);
-
-    final examState = context.read<ExamCubit>().state;
-    if (examState is ExamLoaded) {
-      final questions = examState.examData['questions'] as List<dynamic>;
-      final unit1 = questions.take(30).toList();
-      _unitTotal = unit1.length;
-
-      final selectedMap = examState.selectedAnswers;
-      int correct = 0;
-      int wrong = 0;
-
-      for (var q in unit1) {
-        final qid = q['questionId'];
-        final sel = selectedMap[qid];
-        if (sel != null) {
-          if (sel == qid) {
-            correct++;
-          } else {
-            wrong++;
-          }
-        }
-      }
-
-      setState(() {
-        _correctCount = correct;
-        _wrongCount = wrong;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return BlocListener<ExamCubit, ExamState>(
-      listenWhen: (_, __) => true,
-      listener: (_, __) => _loadHeaderProgress(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            "Tractors and Trailers",
-            style: GoogleFonts.robotoSlab(
-              fontWeight: FontWeight.w500,
-              fontSize: 16,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          "Tractors and Trailers",
+          style: GoogleFonts.robotoSlab(fontWeight: FontWeight.w500, fontSize: 16),
+        ),
+        actions: [
+          IconButton(
+            icon: Image.asset("assets/icons/subscription.png", width: 132, height: 132),
+            onPressed: () {
+              // TODO: Implement subscription
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          _buildShadowDivider(),
+          _buildTabBar(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                QuestionsBankTab(),
+                UnitsTab(),
+              ],
             ),
           ),
-          actions: [
-            IconButton(
-              icon: Image.asset(
-                "assets/icons/subscription.png",
-                width: 132,
-                height: 132,
-              ),
-              onPressed: () {
-                // TODO: Implement subscription action
-              },
-            ),
-          ],
-        ),
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header divider shadow
-            Container(
-              height: 1,
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 7),
-                  ),
-                ],
-              ),
-            ),
-
-            // Tabs row
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Image.asset(
-                    "assets/icons/the_star.png",
-                    width: 40,
-                    height: 40,
-                  ),
-                  const SizedBox(width: 12),
-                  _buildTabButton("Questions Bank", 0, 86),
-                  const SizedBox(width: 12),
-                  _buildTabButton("Exams", 1, 50),
-                ],
-              ),
-            ),
-
-            // Tab content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: const [
-                  QuestionsBankTab(),
-                  UnitsTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildTabButton(String text, int index, double underlineWidth) {
-    final isActive = _tabController.index == index;
+  Widget _buildShadowDivider() {
+    return Container(
+      height: 1,
+      decoration: BoxDecoration(
+        color: Colors.black12,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextButton(
-          onPressed: () => _tabController.animateTo(index),
-          child: Text(
-            text,
-            style: TextStyle(
-              color: isActive ? Colors.black : Colors.black54,
-              fontWeight: FontWeight.bold,
-            ),
+  Widget _buildTabBar() {
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Image.asset("assets/icons/the_star.png", width: 40, height: 40),
+          const SizedBox(width: 12),
+          CustomTabButton(
+            text: "Questions Bank",
+            isActive: _tabController.index == 0,
+            onTap: () => _tabController.animateTo(0),
+            underlineWidth: 86,
           ),
-        ),
-        if (isActive)
-          Container(
-            margin: const EdgeInsets.only(top: 6),
-            height: 4,
-            width: underlineWidth,
-            color: Colors.black,
+          const SizedBox(width: 12),
+          CustomTabButton(
+            text: "Exams",
+            isActive: _tabController.index == 1,
+            onTap: () => _tabController.animateTo(1),
+            underlineWidth: 50,
           ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -234,7 +131,7 @@ class _TractorsDashboardState extends State<TractorsDashboard>
 // Questions Bank Tab
 // =====================
 class QuestionsBankTab extends StatefulWidget {
-  const QuestionsBankTab();
+  const QuestionsBankTab({Key? key}) : super(key: key);
 
   @override
   State<QuestionsBankTab> createState() => _QuestionsBankTabState();
@@ -247,7 +144,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
 
   @override
   void dispose() {
-    flutterTts.stop();
+    TTSService.stop();
     _pageController.dispose();
     super.dispose();
   }
@@ -279,14 +176,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
                     });
                   },
                   itemCount: questions.length,
-                  itemBuilder: (context, index) {
-                    return _buildQuestionPage(
-                      context,
-                      questions,
-                      index,
-                      state,
-                    );
-                  },
+                  itemBuilder: (context, index) => _buildQuestionPage(questions, index, state),
                 ),
               ),
               _buildNavigationBar(questions.length),
@@ -299,188 +189,71 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     );
   }
 
-  Widget _buildQuestionPage(
-      BuildContext context,
-      List<dynamic> questions,
-      int index,
-      ExamLoaded state,
-      ) {
-    final q = questions[index];
-    final answers = q["answers"] as List<dynamic>;
-    final questionId = q["questionId"];
+  Widget _buildQuestionPage(List<dynamic> questions, int index, ExamLoaded state) {
+    final question = questions[index];
+    final answers = question["answers"] as List<dynamic>;
+    final questionId = question["questionId"];
     final selected = state.selectedAnswers[questionId];
 
     return Column(
       children: [
-        // English Card
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Card(
-              elevation: 4,
-              color: Colors.white,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Q${index + 1}: ${q['questionText']}",
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Divider(height: 24),
-                            ...answers.map((ans) => _buildAnswerOption(
-                              ans,
-                              questionId,
-                              selected,
-                              context,
-                            )),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // TTS Button
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: IconButton(
-                        icon: SvgPicture.asset(
-                          "assets/icons/tts.svg",
-                          width: 32,
-                          height: 32,
-                        ),
-                        onPressed: () => _playEnglishTTS(context, q, answers, index),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildEnglishQuestionCard(question, answers, questionId, selected),
           ),
         ),
-
-        // Arabic Card
-        _buildArabicCard(q, answers, index),
-
-        // Show Answer Button
-        _buildShowAnswerButton(context, questions, index),
+        ArabicExpansionCard(
+          question: question,
+          answers: answers,
+          onTTSTap: () => _speakArabic(question, answers),
+        ),
+        _buildShowAnswerButton(questions, index),
       ],
     );
   }
 
-  Widget _buildAnswerOption(
-      dynamic ans,
+  Widget _buildEnglishQuestionCard(
+      Map<String, dynamic> question,
+      List<dynamic> answers,
       int questionId,
       int? selected,
-      BuildContext context,
       ) {
-    final answerId = ans["answerId"];
-    final isCorrect = answerId == questionId;
-    final isSelected = selected == answerId;
-
-    Color? bg;
-    Color textColor = Colors.black;
-
-    if (_showAnswer && isCorrect) {
-      bg = Colors.green.withOpacity(0.85);
-      textColor = Colors.white;
-    } else if (_showAnswer && isSelected && !isCorrect) {
-      bg = Colors.red.withOpacity(0.85);
-      textColor = Colors.white;
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: RadioListTile<int>(
-        title: Text(
-          ans["answerText"],
-          style: TextStyle(color: textColor),
-        ),
-        value: answerId,
-        groupValue: selected,
-        onChanged: (val) {
-          if (val != null && !_showAnswer) {
-            context.read<ExamCubit>().selectAnswer(questionId, val);
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildArabicCard(dynamic q, List<dynamic> answers, int index) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Card(
-        elevation: 4,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          title: const Text(
-            "Show Arabic Translation",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+    return Card(
+      elevation: 4,
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
           children: [
-            const Divider(height: 20),
-            // Arabic Question
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  q["questionTextAr"] ?? "",
-                  textDirection: TextDirection.rtl,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Q${_currentPage + 1}: ${question['questionText']}",
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(height: 24),
+                    ...answers.map((ans) => AnswerOption(
+                      answer: ans,
+                      questionId: questionId,
+                      selectedAnswer: selected,
+                      showAnswer: _showAnswer,
+                      onTap: !_showAnswer
+                          ? () => context.read<ExamCubit>().selectAnswer(questionId, ans["answerId"])
+                          : null,
+                    )),
+                  ],
                 ),
               ),
             ),
-            // Arabic Answers
-            ...answers.map((ans) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    ans["answerTextAr"] ?? "",
-                    textDirection: TextDirection.rtl,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ),
-              );
-            }),
-            // Arabic TTS button
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: Alignment.centerRight,
               child: IconButton(
-                icon: SvgPicture.asset(
-                  "assets/icons/tts.svg",
-                  width: 32,
-                  height: 32,
-                ),
-                onPressed: () => _playArabicTTS(context, q, answers),
+                icon: SvgPicture.asset("assets/icons/tts.svg", width: 32, height: 32),
+                onPressed: () => _speakEnglish(question, answers),
               ),
             ),
           ],
@@ -489,52 +262,18 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     );
   }
 
-  Widget _buildShowAnswerButton(
-      BuildContext context,
-      List<dynamic> questions,
-      int index,
-      ) {
+  Widget _buildShowAnswerButton(List<dynamic> questions, int index) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF64B2EF),
+            backgroundColor: kSecondaryColor,
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           ),
-          onPressed: () async {
-            setState(() {
-              _showAnswer = true;
-            });
-
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setInt('progress_questionsbank', _currentPage);
-
-            await Future.delayed(const Duration(seconds: 1));
-
-            if (mounted) {
-              setState(() {
-                _showAnswer = false;
-              });
-
-              if (index < questions.length - 1) {
-                _pageController.nextPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("You have reached the last question"),
-                  ),
-                );
-              }
-            }
-          },
+          onPressed: () => _handleShowAnswer(questions, index),
           child: Text(
             "Show Answer",
             style: GoogleFonts.robotoSlab(
@@ -548,6 +287,30 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     );
   }
 
+  Future<void> _handleShowAnswer(List<dynamic> questions, int index) async {
+    setState(() => _showAnswer = true);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('progress_questionsbank', _currentPage);
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (mounted) {
+      setState(() => _showAnswer = false);
+
+      if (index < questions.length - 1) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You have reached the last question")),
+        );
+      }
+    }
+  }
+
   Widget _buildNavigationBar(int totalQuestions) {
     return Padding(
       padding: const EdgeInsets.all(12.0),
@@ -556,12 +319,10 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
           IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: _currentPage > 0
-                ? () {
-              _pageController.previousPage(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            }
+                ? () => _pageController.previousPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            )
                 : null,
           ),
           Expanded(
@@ -571,20 +332,16 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
               max: (totalQuestions - 1).toDouble(),
               divisions: totalQuestions - 1,
               label: "Q${_currentPage + 1}",
-              onChanged: (val) {
-                _pageController.jumpToPage(val.toInt());
-              },
+              onChanged: (val) => _pageController.jumpToPage(val.toInt()),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.arrow_forward),
             onPressed: _currentPage < totalQuestions - 1
-                ? () {
-              _pageController.nextPage(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            }
+                ? () => _pageController.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            )
                 : null,
           ),
         ],
@@ -592,59 +349,32 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     );
   }
 
-  void _playEnglishTTS(
-      BuildContext context,
-      dynamic q,
-      List<dynamic> answers,
-      int index,
-      ) {
-    final snackBar = SnackBar(
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      behavior: SnackBarBehavior.floating,
-      content: AwesomeSnackbarContent(
-        title: 'Text-to-Speech',
-        message: 'Commencing text to speech...',
-        contentType: ContentType.help,
-      ),
+  void _speakEnglish(Map<String, dynamic> question, List<dynamic> answers) {
+    TTSService.showSnackBar(
+      context,
+      'Text-to-Speech',
+      'Commencing text to speech...',
+      ContentType.help,
     );
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(snackBar);
+    final text = "Q${_currentPage + 1}: ${question['questionText']}. "
+        "${answers.asMap().entries.map((e) => "${e.key + 1}. ${e.value['answerText']}").join(", ")}";
 
-    final enText = "Q${index + 1}: ${q['questionText']}. ${answers.asMap().entries.map((e) {
-      return "${e.key + 1}. ${e.value['answerText']}";
-    }).join(", ")}";
-
-    speak(enText, context, langCode: "en-US");
+    TTSService.speak(text, context, langCode: "en-US");
   }
 
-  void _playArabicTTS(
-      BuildContext context,
-      dynamic q,
-      List<dynamic> answers,
-      ) {
-    final snackBar = SnackBar(
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      behavior: SnackBarBehavior.floating,
-      content: AwesomeSnackbarContent(
-        title: 'Text-to-Speech',
-        message: 'Commencing text to speech...',
-        contentType: ContentType.help,
-      ),
+  void _speakArabic(Map<String, dynamic> question, List<dynamic> answers) {
+    TTSService.showSnackBar(
+      context,
+      'Text-to-Speech',
+      'Commencing text to speech...',
+      ContentType.help,
     );
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(snackBar);
+    final text = "${question['questionTextAr']}. "
+        "${answers.asMap().entries.map((e) => "${e.key + 1}. ${e.value['answerTextAr']}").join("، ")}";
 
-    final arText = "${q['questionTextAr']}. ${answers.asMap().entries.map((e) {
-      return "${e.key + 1}. ${e.value['answerTextAr']}";
-    }).join("، ")}";
-
-    speak(arText, context, langCode: "ar-SA");
+    TTSService.speak(text, context, langCode: "ar-SA");
   }
 }
 
@@ -652,7 +382,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
 // Units Tab
 // =====================
 class UnitsTab extends StatefulWidget {
-  const UnitsTab();
+  const UnitsTab({Key? key}) : super(key: key);
 
   @override
   State<UnitsTab> createState() => _UnitsTabState();
@@ -662,10 +392,6 @@ class _UnitsTabState extends State<UnitsTab> {
   final Map<String, double> _unitProgress = {};
   Map<String, dynamic>? _previousMistakesExam;
 
-  void _updateProgress(String title, double progress) {
-    setState(() => _unitProgress[title] = progress);
-  }
-
   @override
   void initState() {
     super.initState();
@@ -674,14 +400,11 @@ class _UnitsTabState extends State<UnitsTab> {
 
   Future<void> _loadPreviousMistakesExam() async {
     final examCubit = context.read<ExamCubit>();
-
-    // Load the saved previous mistakes exam (if it exists)
     final mistakesExam = await examCubit.loadPreviousMistakesExam();
 
     if (!mounted) return;
 
     if (mistakesExam != null) {
-      //  Automatically clean solved questions using the latest exam data
       final state = examCubit.state;
       if (state is ExamLoaded) {
         await examCubit.updatePreviousMistakesAfterExam(
@@ -690,20 +413,14 @@ class _UnitsTabState extends State<UnitsTab> {
         );
       }
 
-      // Update the local state so UI can show it
-      setState(() {
-        _previousMistakesExam = mistakesExam;
-      });
-
-      debugPrint(
-        " Loaded 'Previous Mistakes' exam with "
-            "${mistakesExam["questions"].length} questions.",
-      );
-    } else {
-      debugPrint("⚠No 'Previous Mistakes' exam found in storage.");
+      setState(() => _previousMistakesExam = mistakesExam);
+      debugPrint("✅ Loaded 'Previous Mistakes' exam with ${mistakesExam["questions"].length} questions.");
     }
   }
 
+  void _updateProgress(String title, double progress) {
+    setState(() => _unitProgress[title] = progress);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -721,13 +438,12 @@ class _UnitsTabState extends State<UnitsTab> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                _buildUnitButton(context, "Basics", questions, 0, 30.clamp(0, total)),
+                _buildNormalUnit(context, "Basics", questions, 0, 30.clamp(0, total)),
                 const SizedBox(height: 20),
-                _buildUnitButton(context, "CDL trailers", questions, 30, 64.clamp(0, total)),
+                _buildNormalUnit(context, "CDL trailers", questions, 30, 64.clamp(0, total)),
                 const SizedBox(height: 20),
-                _buildUnitButton(context, "Time Attack", questions, 0, total, isTimeAttack: true),
-                if (_previousMistakesExam != null)
-                  _buildPreviousMistakesButton(context, _previousMistakesExam!),
+                _buildTimeAttackUnit(context, questions),
+                if (_previousMistakesExam != null) _buildPreviousMistakesUnit(context),
               ],
             ),
           ),
@@ -736,233 +452,114 @@ class _UnitsTabState extends State<UnitsTab> {
     );
   }
 
-  // Normal unit button builder (unchanged)
-  Widget _buildUnitButton(
+  Widget _buildNormalUnit(
       BuildContext context,
       String title,
       List<dynamic> allQuestions,
-      int startIndex,
-      int endIndex, {
-        bool isTimeAttack = false,
-      }) {
-    final count = endIndex - startIndex;
+      int start,
+      int end,
+      ) {
+    final count = end - start;
     if (count <= 0) return const SizedBox.shrink();
 
-    final progress = _unitProgress[title] ?? 0.0;
-    final unitQuestions = allQuestions.sublist(startIndex, endIndex);
+    return UnitButton(
+      title: title,
+      questionCount: count,
+      progress: _unitProgress[title] ?? 0.0,
+      iconAsset: "assets/icons/unit_button_icon.png",
+      onTap: () => _navigateToUnit(context, title, allQuestions.sublist(start, end), start, end),
+    );
+  }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        elevation: 4,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            if (isTimeAttack) {
-              //  Show a short explanation before starting
-              final start = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  title: const Text("Time Attack Mode"),
-                  content: const Text(
-                    "You’ll have 10 seconds to answer each question.\n"
-                        "Ready to start?",
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text("Cancel"),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text("Start"),
-                    ),
-                  ],
-                ),
-              );
+  Widget _buildTimeAttackUnit(BuildContext context, List<dynamic> allQuestions) {
+    return UnitButton(
+      title: "⚡ Time Attack",
+      questionCount: AppConstants.timeAttackQuestions,
+      progress: 0,
+      iconAsset: "assets/icons/unit_button_icon.png",
+      onTap: () => _startTimeAttack(context, allQuestions),
+    );
+  }
 
-              if (start != true) return;
+  Widget _buildPreviousMistakesUnit(BuildContext context) {
+    final exam = _previousMistakesExam!;
+    final questions = (exam["questions"] ?? []) as List<dynamic>;
 
-              //  Randomize 20 questions from allQuestions
-              final randomized = List<dynamic>.from(allQuestions)..shuffle();
-              final selected = randomized.take(30).toList();
+    if (questions.isEmpty) return const SizedBox.shrink();
 
-              await Navigator.push<double>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => UnitQuestionsScreen(
-                    title: " Time Attack",
-                    questions: selected,
-                    startIndex: 0,
-                    endIndex: selected.length,
-                    isTimed: true,
-                  ),
-                ),
-              );
-              return;
-            }
+    return UnitButton(
+      title: exam["title"] ?? "Previous Mistakes",
+      questionCount: questions.length,
+      progress: _unitProgress[exam["title"]] ?? 0.0,
+      accentColor: kErrorColor,
+      icon: Icons.error_outline,
+      onTap: () => _navigateToUnit(context, exam["title"], questions, 0, questions.length),
+    );
+  }
 
-            // 🔹 Normal Unit Mode
-            final result = await Navigator.push<double>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => UnitQuestionsScreen(
-                  title: title,
-                  questions: unitQuestions,
-                  startIndex: startIndex,
-                  endIndex: endIndex,
-                ),
-              ),
-            );
-            if (result != null) _updateProgress(title, result);
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Image.asset(
-                      "assets/icons/unit_button_icon.png",
-                      width: 28,
-                      height: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF878C9F),
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right, color: Colors.black54),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text(
-                      isTimeAttack
-                          ? "30 Random Questions"
-                          : "$count Questions",
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.black87),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: isTimeAttack ? 0 : progress,
-                          minHeight: 10,
-                          backgroundColor: const Color(0xFFD9D9D9),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF64B2EF)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+  Future<void> _startTimeAttack(BuildContext context, List<dynamic> allQuestions) async {
+    final start = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text("Time Attack Mode"),
+        content: const Text(
+          "You'll have 10 seconds to answer each question.\nReady to start?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
           ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Start"),
+          ),
+        ],
+      ),
+    );
+
+    if (start != true) return;
+
+    final randomized = List<dynamic>.from(allQuestions)..shuffle();
+    final selected = randomized.take(AppConstants.timeAttackQuestions).toList();
+
+    await Navigator.push<double>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnitQuestionsScreen(
+          title: "⚡ Time Attack",
+          questions: selected,
+          startIndex: 0,
+          endIndex: selected.length,
+          isTimed: true,
         ),
       ),
     );
   }
 
-
-  // Special button for “Previous Mistakes”
-  Widget _buildPreviousMistakesButton(BuildContext context, Map<String, dynamic> mistakesExam) {
-    final title = mistakesExam["title"] ?? "Previous Mistakes";
-    final questions = (mistakesExam["questions"] ?? []) as List<dynamic>;
-    final count = questions.length;
-    final progress = _unitProgress[title] ?? 0.0;
-
-    if (count == 0) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Material(
-        color: const Color(0xFFF9F9FF),
-        borderRadius: BorderRadius.circular(16),
-        elevation: 4,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            final result = await Navigator.push<double>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => UnitQuestionsScreen(
-                  title: title,
-                  questions: questions,
-                  startIndex: 0,
-                  endIndex: count,
-                ),
-              ),
-            );
-            if (result != null) _updateProgress(title, result);
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: Color(0xFFEF6461), size: 28),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFEF6461),
-                        ),
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right, color: Colors.black54),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Text("$count Questions",
-                        style: const TextStyle(fontSize: 14, color: Colors.black87)),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 10,
-                          backgroundColor: const Color(0xFFD9D9D9),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFEF6461)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+  Future<void> _navigateToUnit(
+      BuildContext context,
+      String title,
+      List<dynamic> questions,
+      int start,
+      int end,
+      ) async {
+    final result = await Navigator.push<double>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnitQuestionsScreen(
+          title: title,
+          questions: questions,
+          startIndex: start,
+          endIndex: end,
         ),
       ),
     );
+
+    if (result != null) _updateProgress(title, result);
   }
 }
-
-
-
 
 // =====================
 // Unit Questions Screen
@@ -1418,10 +1015,10 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
           ),
           Row(
             children: [
-              Text("✓ $_correctCount",
+              Text("$_correctCount",
                   style: GoogleFonts.robotoSlab(color: Colors.green[700])),
               const SizedBox(width: 10),
-              Text("✕ $_wrongCount",
+              Text("$_wrongCount",
                   style: GoogleFonts.robotoSlab(color: Colors.red[700])),
             ],
           ),

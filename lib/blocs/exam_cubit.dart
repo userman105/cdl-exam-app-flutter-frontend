@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,6 +15,7 @@ class ExamCubit extends Cubit<ExamState> {
 
   Future<void> loadExam(BuildContext context, int examId) async {
     emit(ExamLoading());
+
     try {
       final response = await http
           .get(Uri.parse('http://10.0.2.2:3333/exam-attempts/$examId'))
@@ -26,10 +28,19 @@ class ExamCubit extends Cubit<ExamState> {
         await prefs.setString("exam_$examId", jsonEncode(data));
 
         emit(ExamLoaded(examData: data, selectedAnswers: {}));
+        return;
       } else {
-        throw Exception("Failed to fetch exam: ${response.statusCode}");
+        emit(ExamError("Failed to fetch exam: ${response.statusCode}"));
+        return;
       }
+    } on http.ClientException catch (e) {
+      emit(ExamError("Network error: ${e.message}"));
+      return;
+    } on TimeoutException {
+      emit(ExamError("Request timed out. Please check your internet connection."));
+      return;
     } catch (e) {
+      debugPrint(" loadExam failed: $e");
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString("exam_$examId");
 
@@ -53,8 +64,10 @@ class ExamCubit extends Cubit<ExamState> {
       } else {
         emit(ExamError("No cached exam found and failed to fetch online."));
       }
+      return;
     }
   }
+
 
   void selectAnswer(int questionId, int answerId) {
     if (state is ExamLoaded) {
@@ -98,7 +111,7 @@ class ExamCubit extends Cubit<ExamState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString("exam_previous_mistakes", jsonEncode(mistakesExam));
 
-    debugPrint("✅ Created 'Previous Mistakes' exam with ${mistakeQuestions.length} questions");
+    debugPrint(" Created 'Previous Mistakes' exam with ${mistakeQuestions.length} questions");
   }
 
   Future<Map<String, dynamic>?> loadPreviousMistakesExam() async {
