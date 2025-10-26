@@ -141,7 +141,13 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _showAnswer = false;
+  int _getCorrectAnswerIdForTrailersAndTractors(int questionId) {
+    // For Airbrakes questions:
+    // correct = (q)
+    return  questionId;
+  }
 
+  
   @override
   void dispose() {
     TTSService.stop();
@@ -241,6 +247,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
                       questionId: questionId,
                       selectedAnswer: selected,
                       showAnswer: _showAnswer,
+                      correctAnswerId: _getCorrectAnswerIdForTrailersAndTractors(questionId),
                       onTap: !_showAnswer
                           ? () => context.read<ExamCubit>().selectAnswer(questionId, ans["answerId"])
                           : null,
@@ -390,36 +397,47 @@ class UnitsTab extends StatefulWidget {
 
 class _UnitsTabState extends State<UnitsTab> {
   final Map<String, double> _unitProgress = {};
-  Map<String, dynamic>? _previousMistakesExam;
+  late Future<Map<String, dynamic>?> _mistakesExamFuture;
+
 
   @override
   void initState() {
     super.initState();
-    _loadPreviousMistakesExam();
+    _loadProgress();
+    _mistakesExamFuture = context.read<ExamCubit>().getPreviousMistakesExamData("tractors");
   }
 
-  Future<void> _loadPreviousMistakesExam() async {
-    final examCubit = context.read<ExamCubit>();
-    final mistakesExam = await examCubit.loadPreviousMistakesExam();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _mistakesExamFuture = context.read<ExamCubit>().getPreviousMistakesExamData("tractors");
 
-    if (!mounted) return;
+  }
 
-    if (mistakesExam != null) {
-      final state = examCubit.state;
-      if (state is ExamLoaded) {
-        await examCubit.updatePreviousMistakesAfterExam(
-          state.selectedAnswers,
-          state.examData["questions"] as List<dynamic>,
-        );
-      }
 
-      setState(() => _previousMistakesExam = mistakesExam);
-      debugPrint("✅ Loaded 'Previous Mistakes' exam with ${mistakesExam["questions"].length} questions.");
+
+  // 🔹 Save progress persistently
+  Future<void> _saveProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("unit_progress", jsonEncode(_unitProgress));
+    debugPrint("✅ Saved unit progress: $_unitProgress");
+  }
+
+  // 🔹 Load saved progress
+  Future<void> _loadProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString("unit_progress");
+    if (saved != null) {
+      setState(() => _unitProgress.addAll(Map<String, double>.from(jsonDecode(saved))));
+      debugPrint("✅ Loaded unit progress: $_unitProgress");
+    } else {
+      debugPrint("ℹ️ No saved progress found.");
     }
   }
 
   void _updateProgress(String title, double progress) {
     setState(() => _unitProgress[title] = progress);
+    _saveProgress(); // 🔹 persist immediately
   }
 
   @override
@@ -430,7 +448,11 @@ class _UnitsTabState extends State<UnitsTab> {
           return const Center(child: Text("Load an exam to see units"));
         }
 
-        final questions = state.examData["questions"] as List<dynamic>;
+        final questions = state.examData["questions"] as List<dynamic>?;
+        if (questions == null || questions.isEmpty) {
+          return const Center(child: Text("No tractor questions available."));
+        }
+
         final total = questions.length;
 
         return Padding(
@@ -438,12 +460,30 @@ class _UnitsTabState extends State<UnitsTab> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _mistakesExamFuture,
+                  builder: (context, snapshot) {
+                    // Show nothing while loading
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final exam = snapshot.data;
+                    // Check if data exists and has questions
+                    if (exam != null && (exam["questions"] as List?)?.isNotEmpty == true) {
+                      // Pass the loaded exam data to the build method
+                      return _buildPreviousMistakesUnit(context, exam);
+                    }
+                    // Hide if no data is found
+                    return const SizedBox.shrink();
+                  },
+                ),
+                const SizedBox(height: 20),
                 _buildNormalUnit(context, "Basics", questions, 0, 30.clamp(0, total)),
                 const SizedBox(height: 20),
                 _buildNormalUnit(context, "CDL trailers", questions, 30, 64.clamp(0, total)),
                 const SizedBox(height: 20),
                 _buildTimeAttackUnit(context, questions),
-                if (_previousMistakesExam != null) _buildPreviousMistakesUnit(context),
               ],
             ),
           ),
@@ -467,7 +507,8 @@ class _UnitsTabState extends State<UnitsTab> {
       questionCount: count,
       progress: _unitProgress[title] ?? 0.0,
       iconAsset: "assets/icons/unit_button_icon.png",
-      onTap: () => _navigateToUnit(context, title, allQuestions.sublist(start, end), start, end),
+      onTap: () =>
+          _navigateToUnit(context, title, allQuestions.sublist(start, end), start, end),
     );
   }
 
@@ -481,19 +522,36 @@ class _UnitsTabState extends State<UnitsTab> {
     );
   }
 
-  Widget _buildPreviousMistakesUnit(BuildContext context) {
-    final exam = _previousMistakesExam!;
+  Widget _buildPreviousMistakesUnit(BuildContext context, Map<String, dynamic> exam) {
+    // REMOVE: final exam = _previousMistakesExam!;
     final questions = (exam["questions"] ?? []) as List<dynamic>;
 
     if (questions.isEmpty) return const SizedBox.shrink();
 
-    return UnitButton(
-      title: exam["title"] ?? "Previous Mistakes",
-      questionCount: questions.length,
-      progress: _unitProgress[exam["title"]] ?? 0.0,
-      accentColor: kErrorColor,
-      icon: Icons.error_outline,
-      onTap: () => _navigateToUnit(context, exam["title"], questions, 0, questions.length),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Previous Mistakes",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        UnitButton(
+          title: exam["title"] ?? "Previous Mistakes",
+          questionCount: questions.length,
+          progress: _unitProgress[exam["title"]] ?? 0.0,
+          accentColor: kErrorColor,
+          icon: Icons.error_outline,
+          onTap: () {
+            // NEW: Load the mistakes exam into the Cubit state when button is tapped
+            context.read<ExamCubit>().loadMistakesExamIntoState(exam);
+
+            // Then navigate to the UnitQuestionsScreen using the newly loaded state
+            _navigateToUnit(context, exam["title"], questions, 0, questions.length);
+          },
+        ),
+        const SizedBox(height: 20),
+      ],
     );
   }
 
@@ -545,6 +603,7 @@ class _UnitsTabState extends State<UnitsTab> {
       int start,
       int end,
       ) async {
+    // Push the UnitQuestionsScreen and wait for a result
     final result = await Navigator.push<double>(
       context,
       MaterialPageRoute(
@@ -557,22 +616,59 @@ class _UnitsTabState extends State<UnitsTab> {
       ),
     );
 
-    if (result != null) _updateProgress(title, result);
+    // When coming back, trigger rebuild even if result is null
+    if (mounted) {
+      setState(() {
+        if (result != null) {
+          _updateProgress(title, result);
+        }
+        // Force refresh for updated progress or data
+      });
+    }
   }
 }
+
 
 // =====================
 // Unit Questions Screen
 // =====================
 
 class UnitQuestionsScreen extends StatefulWidget {
+
+  static List<dynamic> _mistakeCache = [];
+  static List<dynamic> get mistakeCache => _mistakeCache;
+  final mistakes = UnitQuestionsScreen.mistakeCache;
+
+  static Future<void> loadMistakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys()
+        .where((k) => k.startsWith("exam_previous_mistakes_"))
+        .toList();
+
+    _mistakeCache.clear();
+
+    for (final key in keys) {
+      final saved = prefs.getString(key);
+      if (saved != null) {
+        try {
+          final decoded = jsonDecode(saved);
+          _mistakeCache.add(decoded);
+        } catch (e) {
+          debugPrint("⚠️ Skipped invalid cache entry $key: $e");
+        }
+      }
+    }
+
+    debugPrint("📦 Loaded ${_mistakeCache.length} cached mistake exams at startup.");
+  }
+
   final String title;
   final List<dynamic> questions;
   final int startIndex;
   final int endIndex;
   final bool isTimed; // 🔹 for Time Attack mode
 
-  const UnitQuestionsScreen({
+   UnitQuestionsScreen({
     super.key,
     required this.title,
     required this.questions,
@@ -619,13 +715,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     await prefs.setString("previous_mistakes", jsonEncode(_mistakeCache));
   }
 
-  static Future<void> loadMistakes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString("previous_mistakes");
-    if (stored != null) {
-      _mistakeCache = List<Map<String, dynamic>>.from(jsonDecode(stored));
-    }
-  }
+
 
   Future<void> _recordMistake(Map<String, dynamic> question) async {
     final exists = _mistakeCache.any((q) => q["questionId"] == question["questionId"]);
@@ -637,22 +727,23 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       await _saveMistakes();
 
       if (_mistakeCache.length >= 10) {
-        _createMistakeExam();
+        _createMistakeExam("tractors");
       }
     }
   }
 
-  Future<void> _createMistakeExam() async {
+  Future<void> _createMistakeExam([String examKey = "tractors"]) async {
     final prefs = await SharedPreferences.getInstance();
     final mistakeExam = {
-      "title": "Previous Mistakes",
+      "title": "Previous Mistakes ($examKey)",
       "questions": _mistakeCache,
       "total": _mistakeCache.length,
     };
-    await prefs.setString("exam_previous_mistakes", jsonEncode(mistakeExam));
+    await prefs.setString("exam_previous_mistakes_$examKey", jsonEncode(mistakeExam));
+    debugPrint("✅ Saved Previous Mistakes for $examKey with ${_mistakeCache.length} questions");
   }
 
-  // 🔹 Timer logic for Time Attack mode
+
   void _startTimer(Map<String, dynamic> question) {
     if (!widget.isTimed) return;
     _questionTimer?.cancel();

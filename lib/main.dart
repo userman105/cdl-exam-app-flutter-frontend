@@ -1,8 +1,9 @@
+import 'package:cdl_flutter/tractors_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
-
+import 'airbrakes_dashboard.dart';
 import 'first_screen.dart';
 import 'home_screen.dart';
 import 'blocs/auth_cubit.dart';
@@ -16,7 +17,8 @@ void main() async {
   const storage = FlutterSecureStorage();
   final savedToken = await storage.read(key: "auth_token");
   final savedUsername = await storage.read(key: "username");
-
+  await AirbrakesUnitQuestionsScreen.loadMistakes();
+  await UnitQuestionsScreen.loadMistakes();
   // Initialize Dio + repository
   final dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3333"));
   final authRepository = AuthRepository(dio);

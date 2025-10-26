@@ -10,7 +10,6 @@ part 'exam_state.dart';
 class ExamCubit extends Cubit<ExamState> {
   ExamCubit() : super(ExamInitial());
 
-  // Track wrong questions
   final List<int> _wrongQuestionIds = [];
 
   Future<void> loadExam(BuildContext context, int examId) async {
@@ -28,19 +27,14 @@ class ExamCubit extends Cubit<ExamState> {
         await prefs.setString("exam_$examId", jsonEncode(data));
 
         emit(ExamLoaded(examData: data, selectedAnswers: {}));
-        return;
       } else {
         emit(ExamError("Failed to fetch exam: ${response.statusCode}"));
-        return;
       }
-    } on http.ClientException catch (e) {
-      emit(ExamError("Network error: ${e.message}"));
-      return;
     } on TimeoutException {
       emit(ExamError("Request timed out. Please check your internet connection."));
-      return;
     } catch (e) {
-      debugPrint(" loadExam failed: $e");
+      debugPrint("loadExam failed: $e");
+
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString("exam_$examId");
 
@@ -64,10 +58,8 @@ class ExamCubit extends Cubit<ExamState> {
       } else {
         emit(ExamError("No cached exam found and failed to fetch online."));
       }
-      return;
     }
   }
-
 
   void selectAnswer(int questionId, int answerId) {
     if (state is ExamLoaded) {
@@ -79,66 +71,106 @@ class ExamCubit extends Cubit<ExamState> {
   }
 
   Future<void> markAnswerResult(
-      Map<String, dynamic> question, bool isCorrect) async {
+      Map<String, dynamic> question, bool isCorrect, String examKey) async {
     final questionId = question["questionId"] as int;
 
     if (!isCorrect && !_wrongQuestionIds.contains(questionId)) {
       _wrongQuestionIds.add(questionId);
+      debugPrint("❌ Added wrong answer (total now ${_wrongQuestionIds.length})");
     }
 
-    // Create "Previous Mistakes" exam when user hits 10 wrong answers
-    if (_wrongQuestionIds.length == 10) {
-      await _createMistakesExam();
+    // Only create when session ends or after 10+
+    if (_wrongQuestionIds.length >= 10) {
+      await _createMistakesExam(examKey);
     }
   }
 
-  Future<void> _createMistakesExam() async {
+  Future<void> _createMistakesExam(String examKey) async {
     if (state is! ExamLoaded) return;
-    final current = state as ExamLoaded;
-    final allQuestions = current.examData["questions"] as List;
 
-    final mistakeQuestions = allQuestions
+    final current = state as ExamLoaded;
+    final allQuestions = current.examData["questions"] as List?;
+
+    if (allQuestions == null || allQuestions.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    // Load existing mistakes if any
+    List<dynamic> existingMistakes = [];
+    final saved = prefs.getString("exam_previous_mistakes_$examKey");
+    if (saved != null) {
+      try {
+        final existing = jsonDecode(saved);
+        existingMistakes = (existing["questions"] as List?) ?? [];
+      } catch (_) {
+        debugPrint("⚠️ Corrupted previous mistakes data for $examKey, resetting.");
+      }
+    }
+
+    // Add new unique mistakes
+    final newMistakes = allQuestions
         .where((q) => _wrongQuestionIds.contains(q["questionId"]))
-        .take(64)
         .toList();
 
+    // Merge and remove duplicates by questionId
+    final merged = {
+      for (var q in [...existingMistakes, ...newMistakes])
+        q["questionId"]: q
+    }.values.toList();
+
+    final mergedQuestions = merged.take(64).toList();
+
     final mistakesExam = {
-      "id": "mistakes_${DateTime.now().millisecondsSinceEpoch}",
-      "title": "Previous Mistakes",
-      "questions": mistakeQuestions,
+      "id": "mistakes_$examKey",
+      "title": "Previous Mistakes ($examKey)",
+      "questions": mergedQuestions,
     };
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString("exam_previous_mistakes", jsonEncode(mistakesExam));
+    await prefs.setString(
+      "exam_previous_mistakes_$examKey",
+      jsonEncode(mistakesExam),
+    );
 
-    debugPrint(" Created 'Previous Mistakes' exam with ${mistakeQuestions.length} questions");
+    debugPrint(
+      "✅ Saved persistent 'Previous Mistakes ($examKey)' with "
+          "${mergedQuestions.length} questions.",
+    );
   }
 
-  Future<Map<String, dynamic>?> loadPreviousMistakesExam() async {
+  Future<Map<String, dynamic>?> getPreviousMistakesExamData(String examKey) async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString("exam_previous_mistakes");
-    if (saved != null) {
-      return jsonDecode(saved);
+    final data = prefs.getString("exam_previous_mistakes_$examKey");
+    if (data == null) {
+      debugPrint(" No previous mistakes exam found for '$examKey'");
+      return null;
     }
-    return null;
+
+    try {
+      final decoded = jsonDecode(data);
+      debugPrint(" Loaded persistent mistakes exam data for button '$examKey' "
+          "(${(decoded["questions"] as List?)?.length ?? 0} questions)");
+      return decoded;
+    } catch (e) {
+      debugPrint(" Failed to decode mistakes exam for '$examKey': $e");
+      return null;
+    }
   }
 
-  void clearMistakes() {
-    _wrongQuestionIds.clear();
+  Future<void> loadMistakesExamIntoState(Map<String, dynamic> mistakesExam) async {
+    emit(ExamLoaded(examData: mistakesExam, selectedAnswers: {}));
   }
-
-  // 🆕 New: Remove correctly answered questions from the mistakes list
   Future<void> updatePreviousMistakesAfterExam(
-      Map<int, int?> selectedAnswers, List<dynamic> allQuestions) async {
+      Map<int, int?> selectedAnswers,
+      List<dynamic> allQuestions,
+      String examKey) async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString("exam_previous_mistakes");
+    final saved = prefs.getString("exam_previous_mistakes_$examKey");
 
     if (saved == null) return;
 
     final existing = jsonDecode(saved);
     final questions = List<Map<String, dynamic>>.from(existing["questions"]);
 
-    // Keep only those that were NOT correctly answered in the recent exam
     final updatedQuestions = questions.where((q) {
       final qid = q["questionId"];
       final selected = selectedAnswers[qid];
@@ -148,13 +180,13 @@ class ExamCubit extends Cubit<ExamState> {
 
     final updatedExam = {
       "id": existing["id"],
-      "title": "Previous Mistakes",
+      "title": "Previous Mistakes ($examKey)",
       "questions": updatedQuestions,
     };
 
-    await prefs.setString("exam_previous_mistakes", jsonEncode(updatedExam));
+    await prefs.setString("exam_previous_mistakes_$examKey", jsonEncode(updatedExam));
 
-    debugPrint(
-        "🧹 Cleaned 'Previous Mistakes' exam: now ${updatedQuestions.length} questions remain");
+    debugPrint("🧹 Cleaned '$examKey' mistakes exam — now ${updatedQuestions.length} remain.");
   }
+
 }

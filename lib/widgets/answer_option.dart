@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cdl_flutter/constants/constants.dart';
 
 class AnswerOption extends StatelessWidget {
-  final dynamic answer;
+  final Map<String, dynamic> answer;
   final int questionId;
   final int? selectedAnswer;
   final bool showAnswer;
+  final int? correctAnswerId;
   final VoidCallback? onTap;
 
   const AnswerOption({
@@ -13,41 +15,46 @@ class AnswerOption extends StatelessWidget {
     required this.questionId,
     required this.selectedAnswer,
     required this.showAnswer,
+    required this.correctAnswerId,
     this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final answerId = answer["answerId"];
-    final isCorrect = answerId == questionId;
-    final isSelected = selectedAnswer == answerId;
-
-    Color? backgroundColor;
+    Color borderColor = Colors.grey.shade300;
+    Color? fillColor;
     Color textColor = Colors.black;
 
-    if (showAnswer && isCorrect) {
-      backgroundColor = Colors.green.withOpacity(0.85);
-      textColor = Colors.white;
-    } else if (showAnswer && isSelected && !isCorrect) {
-      backgroundColor = Colors.red.withOpacity(0.85);
-      textColor = Colors.white;
+    if (showAnswer) {
+      if (answerId == correctAnswerId) {
+        borderColor = Colors.green;
+        fillColor = Colors.green.withOpacity(0.1);
+        textColor = Colors.green.shade900;
+      } else if (selectedAnswer == answerId && answerId != correctAnswerId) {
+        borderColor = kErrorColor;
+        fillColor = kErrorColor.withOpacity(0.1);
+        textColor = Colors.red.shade900;
+      }
+    } else if (selectedAnswer == answerId) {
+      borderColor = kPrimaryColor;
+      fillColor = kPrimaryColor.withOpacity(0.1);
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black12),
-      ),
-      child: RadioListTile<int>(
-        title: Text(
-          answer["answerText"],
-          style: TextStyle(color: textColor),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: fillColor ?? Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: 2),
         ),
-        value: answerId,
-        groupValue: selectedAnswer,
-        onChanged: onTap != null ? (_) => onTap!() : null,
+        child: Text(
+          answer["answerText"] ?? "",
+          style: TextStyle(fontSize: 16, color: textColor),
+        ),
       ),
     );
   }

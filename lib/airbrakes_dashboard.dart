@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'package:cdl_flutter/report_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../widgets/widgets.dart';
 import '../constants/constants.dart';
 import '../blocs/exam_cubit.dart';
@@ -141,6 +141,13 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
   int _currentPage = 0;
   bool _showAnswer = false;
 
+  int _getCorrectAnswerIdForAirbrakes(int questionId) {
+    // For Airbrakes questions:
+    // correct = 193 + (q - 65)
+    return 193 + (questionId - 65);
+  }
+
+
   @override
   void dispose() {
     TTSService.stop();
@@ -240,6 +247,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
                       questionId: questionId,
                       selectedAnswer: selected,
                       showAnswer: _showAnswer,
+                      correctAnswerId: _getCorrectAnswerIdForAirbrakes(questionId),
                       onTap: !_showAnswer
                           ? () => context.read<ExamCubit>().selectAnswer(questionId, ans["answerId"])
                           : null,
@@ -376,9 +384,10 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
     TTSService.speak(text, context, langCode: "ar-SA");
   }
 }
-//--------------------------
-//------UNITS-TAB-----------
-//--------------------------
+
+// =====================
+// Airbrakes Units Tab
+// =====================
 
 class AirbrakesUnitsTab extends StatefulWidget {
   const AirbrakesUnitsTab({Key? key}) : super(key: key);
@@ -388,103 +397,49 @@ class AirbrakesUnitsTab extends StatefulWidget {
 }
 
 class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
-  Map<String, dynamic>? _previousMistakesExam;
+  final Map<String, double> _unitProgressAirbrakes = {};
+  late Future<Map<String, dynamic>?> _mistakesExamFuture;
+  final String _examKey = "airbrakes";
 
   @override
   void initState() {
     super.initState();
-    _loadPreviousMistakesExam();
+    _loadProgressAirbrakes();
+    _mistakesExamFuture =
+        context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
   }
 
-  Future<void> _loadPreviousMistakesExam() async {
-    final examCubit = context.read<ExamCubit>();
-    final mistakesExam = await examCubit.loadPreviousMistakesExam();
-    if (mounted && mistakesExam != null) {
-      setState(() {
-        _previousMistakesExam = mistakesExam;
-      });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _mistakesExamFuture =
+        context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+  }
+
+  // 🔹 Save Airbrakes progress persistently
+  Future<void> _saveProgressAirbrakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        "unit_progress_airbrakes", jsonEncode(_unitProgressAirbrakes));
+    debugPrint("✅ Saved Airbrakes unit progress: $_unitProgressAirbrakes");
+  }
+
+  // 🔹 Load saved Airbrakes progress
+  Future<void> _loadProgressAirbrakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString("unit_progress_airbrakes");
+    if (saved != null) {
+      setState(() =>
+          _unitProgressAirbrakes.addAll(Map<String, double>.from(jsonDecode(saved))));
+      debugPrint("✅ Loaded Airbrakes unit progress: $_unitProgressAirbrakes");
+    } else {
+      debugPrint("ℹ️ No saved Airbrakes progress found.");
     }
   }
 
-  Widget _buildUnitButton(BuildContext context, String title, List<dynamic> questions, int start, int end) {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: kPrimaryColor,
-        foregroundColor: Colors.white,
-        minimumSize: const Size(double.infinity, 60),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AirbrakesUnitQuestionsScreen(
-              unitName: title,
-              questions: questions.sublist(start, end),
-            ),
-          ),
-        );
-      },
-      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildTimeAttackUnit(BuildContext context, List<dynamic> questions) {
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: kSecondaryColor, width: 2),
-        minimumSize: const Size(double.infinity, 60),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AirbrakesUnitQuestionsScreen(
-              unitName: "Time Attack",
-              questions: questions.take(AppConstants.timeAttackQuestions).toList(),
-              timeLimitSeconds: AppConstants.timeAttackSeconds,
-            ),
-          ),
-        );
-      },
-      child: const Text(
-        "⏱ Time Attack",
-        style: TextStyle(fontSize: 18, color: kSecondaryColor, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-
-  Widget _buildPreviousMistakesUnit(BuildContext context) {
-    final mistakes = _previousMistakesExam?["questions"] as List<dynamic>;
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kErrorColor,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AirbrakesUnitQuestionsScreen(
-                  unitName: "Previous Mistakes",
-                  questions: mistakes,
-                ),
-              ),
-            );
-          },
-          child: const Text(
-            " Previous Mistakes",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    );
+  void _updateProgressAirbrakes(String title, double progress) {
+    setState(() => _unitProgressAirbrakes[title] = progress);
+    _saveProgressAirbrakes(); // 🔹 persist immediately
   }
 
   @override
@@ -495,7 +450,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
           return const Center(child: Text("Load an exam to see units"));
         }
 
-        final questions = state.examData["questions"] as List<dynamic>;
+        final questions = state.examData["questions"] as List<dynamic>? ?? [];
         final total = questions.length;
 
         return Padding(
@@ -503,12 +458,28 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                _buildUnitButton(context, "Basics", questions, 0, 30.clamp(0, total)),
+                FutureBuilder<Map<String, dynamic>?>(
+                  future: _mistakesExamFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final exam = snapshot.data;
+                    if (exam != null && (exam["questions"] as List?)?.isNotEmpty == true) {
+                      return _buildPreviousMistakesUnit(context, exam);
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 const SizedBox(height: 20),
-                _buildUnitButton(context, "Unit 2 (Q31–60)", questions, 30, 64.clamp(0, total)),
+                _buildNormalUnit(context, "Basics", questions, 0, 25.clamp(0, total)),
+                const SizedBox(height: 20),
+                _buildNormalUnit(context, "Brake Systems", questions, 25, 50.clamp(0, total)),
+                const SizedBox(height: 20),
+                _buildNormalUnit(context, "Worst Scenarios", questions, 50, 71.clamp(0, total)),
                 const SizedBox(height: 20),
                 _buildTimeAttackUnit(context, questions),
-                if (_previousMistakesExam != null) _buildPreviousMistakesUnit(context),
               ],
             ),
           ),
@@ -516,80 +487,534 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
       },
     );
   }
+
+  Widget _buildNormalUnit(
+      BuildContext context, String title, List<dynamic> allQuestions, int start, int end) {
+    final count = end - start;
+    if (count <= 0) return const SizedBox.shrink();
+
+    return UnitButton(
+      title: title,
+      questionCount: count,
+      progress: _unitProgressAirbrakes[title] ?? 0.0,
+      iconAsset: "assets/icons/unit_button_icon.png",
+      onTap: () =>
+          _navigateToUnit(context, title, allQuestions.sublist(start, end), start, end),
+    );
+  }
+
+  Widget _buildTimeAttackUnit(BuildContext context, List<dynamic> allQuestions) {
+    return UnitButton(
+      title: "⚡ Time Attack",
+      questionCount: 20,
+      progress: 0,
+      iconAsset: "assets/icons/unit_button_icon.png",
+      onTap: () => _startTimeAttack(context, allQuestions),
+    );
+  }
+
+  Widget _buildPreviousMistakesUnit(BuildContext context, Map<String, dynamic> exam) {
+    final questions = (exam["questions"] ?? []) as List<dynamic>;
+    if (questions.isEmpty) return const SizedBox.shrink();
+
+    return UnitButton(
+      title: exam["title"] ?? "Previous Mistakes",
+      questionCount: questions.length,
+      progress: _unitProgressAirbrakes[exam["title"]] ?? 0.0,
+      accentColor: kErrorColor,
+      icon: Icons.error_outline,
+      onTap: () {
+        context.read<ExamCubit>().loadMistakesExamIntoState(exam);
+        _navigateToUnit(context, exam["title"], questions, 0, questions.length);
+      },
+    );
+  }
+
+  Future<void> _startTimeAttack(BuildContext context, List<dynamic> allQuestions) async {
+    final start = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text("Time Attack Mode"),
+        content: const Text(
+          "You'll have limited time to answer each question.\nReady to start?",
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Start")),
+        ],
+      ),
+    );
+
+    if (start != true) return;
+
+    final randomized = List<dynamic>.from(allQuestions)..shuffle();
+    final selected = randomized.take(20).toList();
+
+    await Navigator.push<double>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AirbrakesUnitQuestionsScreen(
+          title: "⚡ Time Attack",
+          questions: selected,
+          startIndex: 0,
+          endIndex: selected.length,
+          isTimed: true,
+        ),
+      ),
+    );
+  }
+  Future<void> _navigateToUnit(
+      BuildContext context,
+      String title,
+      List<dynamic> questions,
+      int start,
+      int end,
+      ) async {
+    final result = await Navigator.push<double>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AirbrakesUnitQuestionsScreen(
+          title: title,
+          questions: questions,
+          startIndex: start,
+          endIndex: end,
+        ),
+      ),
+    );
+
+
+    if (result != null) _updateProgressAirbrakes(title, result);
+
+
+    setState(() {
+      _mistakesExamFuture =
+          context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+    });
+  }
+
 }
+
 //-----------------------------
-//--------UNIT-QUESTIONSCREEN
+//--------UNIT-QUESTIONSCREEN (No changes needed for persistence fix)
 //----------------------------
 
 class AirbrakesUnitQuestionsScreen extends StatefulWidget {
-  final String unitName;
+  final String title;
   final List<dynamic> questions;
-  final int? timeLimitSeconds;
+  final int startIndex;
+  final int endIndex;
+  final bool isTimed;
+  static List<dynamic> _mistakeCache = [];
+  static List<dynamic> get mistakeCache => _mistakeCache;
 
   const AirbrakesUnitQuestionsScreen({
     Key? key,
-    required this.unitName,
+    required this.title,
     required this.questions,
-    this.timeLimitSeconds,
+    required this.startIndex,
+    required this.endIndex,
+    this.isTimed = false,
   }) : super(key: key);
 
+
+  static Future<void> loadMistakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString("previous_mistakes_airbrakes");
+    if (stored != null) {
+      _mistakeCache = List<Map<String, dynamic>>.from(jsonDecode(stored));
+    }
+  }
+
   @override
-  State<AirbrakesUnitQuestionsScreen> createState() => _AirbrakesUnitQuestionsScreenState();
+  State<AirbrakesUnitQuestionsScreen> createState() =>
+      _AirbrakesUnitQuestionsScreenState();
 }
 
-class _AirbrakesUnitQuestionsScreenState extends State<AirbrakesUnitQuestionsScreen> {
-  int currentIndex = 0;
+class _AirbrakesUnitQuestionsScreenState
+    extends State<AirbrakesUnitQuestionsScreen> {
+  late DateTime _startTime;
+  int _currentIndex = 0;
+  int _correctCount = 0;
+  int _wrongCount = 0;
+  bool _showAnswer = false;
+  bool _isArabicExpanded = false;
+  int? _selectedAnswerId;
+  final FlutterTts _flutterTts = FlutterTts();
+
+  static List<Map<String, dynamic>> _mistakeCache = [];
+  Timer? _questionTimer;
+  int _remainingSeconds = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.now();
+    if (widget.isTimed) _startTimer(widget.questions[_currentIndex]);
+  }
+
+  @override
+  void dispose() {
+    _flutterTts.stop();
+    _questionTimer?.cancel();
+    super.dispose();
+  }
+
+  /// ✅ Airbrakes-specific correct answer formula
+  int _getCorrectAnswerIdForAirbrakes(int questionId) {
+    return 193 + (questionId - 65);
+  }
+
+  Future<void> _saveMistakes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      "previous_mistakes_airbrakes",
+      jsonEncode(_mistakeCache),
+    );
+  }
+
+
+  Future<void> _recordMistake(Map<String, dynamic> question) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = "exam_previous_mistakes_airbrakes";
+    final saved = prefs.getString(key);
+    List<dynamic> existing = [];
+
+    if (saved != null) {
+      try {
+        final decoded = jsonDecode(saved);
+        existing = (decoded["questions"] as List?) ?? [];
+      } catch (_) {}
+    }
+
+    // Avoid duplicates
+    final exists = existing.any((q) => q["questionId"] == question["questionId"]);
+    if (!exists) {
+      existing.add(question);
+      final exam = {
+        "id": "mistakes_airbrakes",
+        "title": "Previous Mistakes (airbrakes)",
+        "questions": existing.take(71).toList(),
+      };
+      await prefs.setString(key, jsonEncode(exam));
+    }
+  }
+
+  void _startTimer(Map<String, dynamic> question) {
+    if (!widget.isTimed) return;
+    _questionTimer?.cancel();
+    _remainingSeconds = 10;
+
+    _questionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds <= 1) {
+        timer.cancel();
+        if (!_showAnswer) _submitAnswer(question);
+      } else {
+        setState(() => _remainingSeconds--);
+      }
+    });
+  }
+
+  void _speakQuestion(Map<String, dynamic> question) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        behavior: SnackBarBehavior.floating,
+        content: AwesomeSnackbarContent(
+          title: 'Text to Speech',
+          message: 'Commencing text-to-speech for this question...',
+          contentType: ContentType.help,
+        ),
+      ),
+    );
+
+    final text = StringBuffer()
+      ..writeln(question["questionText"])
+      ..writeAll(question["answers"].map((a) => a["answerText"]), "\n");
+
+    await _flutterTts.setLanguage("en-US");
+    await _flutterTts.speak(text.toString());
+  }
+
+  void _speakArabic(Map<String, dynamic> question) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        behavior: SnackBarBehavior.floating,
+        content: AwesomeSnackbarContent(
+          title: 'Text to Speech',
+          message: 'Commencing Arabic text-to-speech...',
+          contentType: ContentType.help,
+        ),
+      ),
+    );
+
+    final text = StringBuffer()
+      ..writeln(question["questionTextAr"])
+      ..writeAll(question["answers"].map((a) => a["answerTextAr"]), "\n");
+
+    await _flutterTts.setLanguage("ar-SA");
+    await _flutterTts.speak(text.toString());
+  }
+
+  void _submitAnswer(Map<String, dynamic> question) {
+    if (_selectedAnswerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select an answer first."),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    _questionTimer?.cancel();
+
+    final isCorrect =
+        _selectedAnswerId == _getCorrectAnswerIdForAirbrakes(question["questionId"]);
+
+    if (isCorrect) {
+      _correctCount++;
+    } else {
+      _wrongCount++;
+      _recordMistake(question);
+    }
+
+    setState(() => _showAnswer = true);
+  }
+
+  Future<void> _nextQuestion() async {
+    _showAnswer = false;
+    _selectedAnswerId = null;
+    _isArabicExpanded = false;
+    _remainingSeconds = 10;
+
+    if (_currentIndex < widget.questions.length - 1) {
+      _currentIndex++;
+      if (widget.isTimed) _startTimer(widget.questions[_currentIndex]);
+    } else {
+      await _showResults();
+      return;
+    }
+
+    setState(() {});
+  }
+
+  Future<void> _showResults() async {
+    final totalTime = DateTime.now().difference(_startTime);
+    final percentage = (_correctCount / widget.questions.length) * 100;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ReportCard(
+        correctAnswers: _correctCount,
+        wrongAnswers: _wrongCount,
+        timeElapsed: totalTime,
+        percentage: percentage,
+      ),
+    );
+
+    final progress = (_currentIndex + 1) / widget.questions.length;
+    Navigator.pop(context, progress);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final question = widget.questions[currentIndex];
+    final question = widget.questions[_currentIndex];
+    final answers = question["answers"] as List<dynamic>;
 
     return Scaffold(
-      backgroundColor: kBackgroundColor,
-      appBar: AppBar(
-        title: Text(widget.unitName),
-        backgroundColor: kPrimaryColor,
-      ),
-      body: Padding(
+      appBar: AppBar(title: Text(widget.title)),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            LinearProgressIndicator(
-              value: (currentIndex + 1) / widget.questions.length,
-              color: kSecondaryColor,
-              backgroundColor: Colors.grey[300],
-            ),
-            const SizedBox(height: 24),
+            _headerStatusBox(),
+            const SizedBox(height: 16),
+            _buildEnglishCard(question, answers),
+            const SizedBox(height: 16),
+            _buildArabicCard(question, answers),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnglishCard(
+      Map<String, dynamic> question, List<dynamic> answers) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Text(
-              "Question ${currentIndex + 1}/${widget.questions.length}",
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              question["questionText"],
+              style: GoogleFonts.robotoSlab(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Text(
-                  question["question_text"] ?? "No question text",
-                  style: const TextStyle(fontSize: 18),
+            const SizedBox(height: 12),
+            ...answers.map((ans) {
+              final isSelected = _selectedAnswerId == ans["answerId"];
+              final isCorrect = _showAnswer &&
+                  ans["answerId"] ==
+                      _getCorrectAnswerIdForAirbrakes(question["questionId"]);
+              final isWrong = _showAnswer && isSelected && !isCorrect;
+
+              return GestureDetector(
+                onTap: !_showAnswer
+                    ? () => setState(() => _selectedAnswerId = ans["answerId"])
+                    : null,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isCorrect
+                        ? Colors.green[100]
+                        : isWrong
+                        ? Colors.red[100]
+                        : isSelected
+                        ? Colors.blue[100]
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isCorrect
+                          ? Colors.green
+                          : isWrong
+                          ? Colors.red
+                          : Colors.grey[300]!,
+                    ),
+                  ),
+                  child: Text(
+                    ans["answerText"],
+                    style: GoogleFonts.robotoSlab(fontSize: 16),
+                  ),
                 ),
-              ),
-            ),
+              );
+            }),
             const SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimaryColor,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () {
-                if (currentIndex < widget.questions.length - 1) {
-                  setState(() => currentIndex++);
-                } else {
-                  Navigator.pop(context);
-                }
-              },
-              child: Text(
-                currentIndex == widget.questions.length - 1 ? "Finish" : "Next",
-                style: const TextStyle(fontSize: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _speakQuestion(question),
+                  icon: const Icon(Icons.volume_up),
+                  label: const Text("Read"),
+                ),
+                SizedBox(
+                  width: 160,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF64B2EF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: _showAnswer
+                        ? _nextQuestion
+                        : () => _submitAnswer(question),
+                    child: Text(
+                      _showAnswer ? "Next" : "Submit",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArabicCard(
+      Map<String, dynamic> question, List<dynamic> answers) {
+    return Card(
+      elevation: 4,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.volume_up_rounded,
+                      color: Color(0xFF64B2EF)),
+                  onPressed: () => _speakArabic(question),
+                ),
+                Expanded(
+                  child: Text(
+                    "العربية",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.robotoSlab(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: AnimatedRotation(
+                    turns: _isArabicExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child:
+                    const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                  onPressed: () =>
+                      setState(() => _isArabicExpanded = !_isArabicExpanded),
+                ),
+              ],
+            ),
+            AnimatedCrossFade(
+              crossFadeState: _isArabicExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      question["questionTextAr"],
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(height: 20),
+                    ...answers.map(
+                          (ans) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            ans["answerTextAr"],
+                            textDirection: TextDirection.rtl,
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.black54),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -597,5 +1022,67 @@ class _AirbrakesUnitQuestionsScreenState extends State<AirbrakesUnitQuestionsScr
       ),
     );
   }
-}
 
+  Widget _headerStatusBox() {
+    final progress = (_currentIndex + 1) / widget.questions.length;
+
+    return Container(
+      margin: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text("Q${_currentIndex + 1}/${widget.questions.length}",
+              style: GoogleFonts.robotoSlab(fontWeight: FontWeight.bold)),
+          if (widget.isTimed)
+            Row(
+              children: [
+                const Icon(Icons.timer, size: 18, color: Colors.redAccent),
+                const SizedBox(width: 4),
+                Text(
+                  '$_remainingSeconds s',
+                  style: GoogleFonts.robotoSlab(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+            ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 10,
+                  backgroundColor: const Color(0xFFD9D9D9),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFF64B2EF),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Text("$_correctCount",
+                  style: GoogleFonts.robotoSlab(color: Colors.green[700])),
+              const SizedBox(width: 10),
+              Text("$_wrongCount",
+                  style: GoogleFonts.robotoSlab(color: Colors.red[700])),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
