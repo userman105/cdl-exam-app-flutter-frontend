@@ -406,14 +406,16 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
     super.initState();
     _loadProgressAirbrakes();
     _mistakesExamFuture =
-        context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+        context.read<ExamCubit>().getPreviousMistakesExamData("airbrakes");
+
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _mistakesExamFuture =
-        context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+        context.read<ExamCubit>().getPreviousMistakesExamData("airbrakes");
+
   }
 
   // 🔹 Save Airbrakes progress persistently
@@ -421,7 +423,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         "unit_progress_airbrakes", jsonEncode(_unitProgressAirbrakes));
-    debugPrint("✅ Saved Airbrakes unit progress: $_unitProgressAirbrakes");
+    debugPrint(" Saved Airbrakes unit progress: $_unitProgressAirbrakes");
   }
 
   // 🔹 Load saved Airbrakes progress
@@ -431,9 +433,9 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
     if (saved != null) {
       setState(() =>
           _unitProgressAirbrakes.addAll(Map<String, double>.from(jsonDecode(saved))));
-      debugPrint("✅ Loaded Airbrakes unit progress: $_unitProgressAirbrakes");
+      debugPrint(" Loaded Airbrakes unit progress: $_unitProgressAirbrakes");
     } else {
-      debugPrint("ℹ️ No saved Airbrakes progress found.");
+      debugPrint("ℹ No saved Airbrakes progress found.");
     }
   }
 
@@ -589,7 +591,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
 
     setState(() {
       _mistakesExamFuture =
-          context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+          context.read<ExamCubit>().getPreviousMistakesExamData("airbrakes");
     });
   }
 
@@ -660,7 +662,7 @@ class _AirbrakesUnitQuestionsScreenState
     super.dispose();
   }
 
-  /// ✅ Airbrakes-specific correct answer formula
+  ///  Airbrakes-specific correct answer formula
   int _getCorrectAnswerIdForAirbrakes(int questionId) {
     return 193 + (questionId - 65);
   }
@@ -676,29 +678,37 @@ class _AirbrakesUnitQuestionsScreenState
 
   Future<void> _recordMistake(Map<String, dynamic> question) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = "exam_previous_mistakes_airbrakes";
-    final saved = prefs.getString(key);
-    List<dynamic> existing = [];
+    const examKey = "airbrakes";
+    const key = "exam_previous_mistakes_$examKey"; // match cubit key
 
+    // Load existing mistakes
+    List<dynamic> existing = [];
+    final saved = prefs.getString(key);
     if (saved != null) {
       try {
         final decoded = jsonDecode(saved);
         existing = (decoded["questions"] as List?) ?? [];
-      } catch (_) {}
+      } catch (_) {
+        debugPrint("⚠️ Corrupted mistakes data for $examKey, resetting.");
+      }
     }
 
     // Avoid duplicates
     final exists = existing.any((q) => q["questionId"] == question["questionId"]);
     if (!exists) {
       existing.add(question);
-      final exam = {
-        "id": "mistakes_airbrakes",
-        "title": "Previous Mistakes (airbrakes)",
+
+      final updatedExam = {
+        "id": "mistakes_$examKey",
+        "title": "Previous Mistakes ($examKey)",
         "questions": existing.take(71).toList(),
       };
-      await prefs.setString(key, jsonEncode(exam));
+
+      await prefs.setString(key, jsonEncode(updatedExam));
+      debugPrint("✅ Recorded mistake for Airbrakes: ${question["questionText"]}");
     }
   }
+
 
   void _startTimer(Map<String, dynamic> question) {
     if (!widget.isTimed) return;

@@ -10,6 +10,7 @@ import 'tractors_dashboard.dart';
 import 'first_screen.dart';
 import 'profile_edit.dart';
 import 'airbrakes_dashboard.dart';
+import 'general_dashboard.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -198,7 +199,12 @@ class HomeScreen extends StatelessWidget {
                   _buildButton(
                     label: "General information",
                     iconPath: "assets/icons/general.svg",
-                    onTap: () {},
+                    onTap: () => _loadExamAndNavigate(
+                      context: context,
+                      examId: 3,
+                      destinationBuilder: () =>
+                          GeneralKnowledgeDashboard(initialTabIndex: 1),
+                    ),
                   ),
                   const SizedBox(height: 40),
                   _buildButton(

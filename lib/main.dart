@@ -9,6 +9,7 @@ import 'home_screen.dart';
 import 'blocs/auth_cubit.dart';
 import 'blocs/exam_cubit.dart';
 import 'repositories/auth_repository.dart';
+import 'general_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,7 @@ void main() async {
   final savedUsername = await storage.read(key: "username");
   await AirbrakesUnitQuestionsScreen.loadMistakes();
   await UnitQuestionsScreen.loadMistakes();
+  await GeneralKnowledgeUnitQuestionsScreen.loadMistakes();
   // Initialize Dio + repository
   final dio = Dio(BaseOptions(baseUrl: "http://10.0.2.2:3333"));
   final authRepository = AuthRepository(dio);
