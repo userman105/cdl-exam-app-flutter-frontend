@@ -6,6 +6,8 @@ import 'blocs/auth_cubit.dart';
 import 'home_screen.dart';
 import 'signIn_screen.dart';
 import 'register_screen.dart';
+import 'package:arabic_font/arabic_font.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -84,12 +86,9 @@ class _SplashScreenState extends State<SplashScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 15),
                   ),
                   child: Text(
-                    "Guest",
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
+                    "زائر",
+                    style: ArabicTextStyle(arabicFont: ArabicFont.dubai,
+                    fontSize: 24, fontWeight: FontWeight.w500),
                   ),
                 )
                 ,
@@ -105,17 +104,16 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 15),
                   ),
-                  child: Text("Login",style:
-                  GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white
-                  ),),
+                  child: Text(
+                    "تسجيل الدخول",
+                    style: ArabicTextStyle(arabicFont: ArabicFont.dubai,
+                        fontSize: 24, fontWeight: FontWeight.w500),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 InkWell(onTap: (){Navigator.push(context, MaterialPageRoute(builder: (context)=>RegisterScreen()));},
                   child: Container(
-                    width: 200, height: 30,
+                    width: 370, height: 40,
                     decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(5)
@@ -130,11 +128,11 @@ class _SplashScreenState extends State<SplashScreen>
                           height: 20,
                         )
                         ,const SizedBox(width: 6,),
-                        Text("Register Now !",
-                          style: GoogleFonts.outfit(
-                              fontSize: 16,fontWeight: FontWeight.w500,
-                              color: Colors.white
-                          ),)],
+                        Text(
+                          "قم بالتسجيل للاستمتاع بعروض التطبيق",
+                          style: ArabicTextStyle(arabicFont: ArabicFont.dubai,
+                              fontSize: 20, fontWeight: FontWeight.w500,color: Colors.white),
+                        ),],
                     ),),
                 )
 

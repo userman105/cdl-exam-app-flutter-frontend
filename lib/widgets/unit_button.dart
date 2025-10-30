@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:arabic_font/arabic_font.dart';
 
 class UnitButton extends StatelessWidget {
   final String title;
@@ -48,7 +49,8 @@ class UnitButton extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        style: TextStyle(
+                        style: ArabicTextStyle(
+                          arabicFont: ArabicFont.dubai,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: color,
@@ -62,7 +64,7 @@ class UnitButton extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      "$questionCount Questions",
+                      "$questionCount سؤال ",
                       style: const TextStyle(fontSize: 14, color: Colors.black87),
                     ),
                     const SizedBox(width: 16),

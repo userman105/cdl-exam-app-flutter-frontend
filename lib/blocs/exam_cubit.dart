@@ -18,7 +18,7 @@ class ExamCubit extends Cubit<ExamState> {
     try {
       final response = await http
           .get(Uri.parse('http://10.0.2.2:3333/exam-attempts/$examId'))
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -162,7 +162,8 @@ class ExamCubit extends Cubit<ExamState> {
   Future<void> updatePreviousMistakesAfterExam(
       Map<int, int?> selectedAnswers,
       List<dynamic> allQuestions,
-      String examKey) async {
+      String examKey,
+      ) async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString("exam_previous_mistakes_$examKey");
 
@@ -171,22 +172,52 @@ class ExamCubit extends Cubit<ExamState> {
     final existing = jsonDecode(saved);
     final questions = List<Map<String, dynamic>>.from(existing["questions"]);
 
-    final updatedQuestions = questions.where((q) {
-      final qid = q["questionId"];
+    final updatedQuestions = <Map<String, dynamic>>[];
+
+    for (final q in questions) {
+      final qid = q["questionId"] as int?;
+
+      if (qid == null) continue;
+
       final selected = selectedAnswers[qid];
-      final correct = q["correctAnswer"];
-      return selected != correct;
-    }).toList();
+      final correct = (q["correctAnswer"] ??
+          q["correct_answer_id"] ??
+          q["correct_option_id"]) as int?;
 
-    final updatedExam = {
-      "id": existing["id"],
-      "title": "Previous Mistakes ($examKey)",
-      "questions": updatedQuestions,
-    };
+      // If the user didn't answer or answered wrong → keep it
+      if (selected == null || correct == null || selected != correct) {
+        updatedQuestions.add(q);
+      } else {
+        debugPrint("✅ Removing question $qid (answered correctly)");
+      }
+    }
 
-    await prefs.setString("exam_previous_mistakes_$examKey", jsonEncode(updatedExam));
+    // If all are correct → delete mistakes exam entirely
+    if (updatedQuestions.isEmpty) {
+      await prefs.remove("exam_previous_mistakes_$examKey");
+      debugPrint("🎉 All mistakes fixed for '$examKey' — exam removed.");
+    } else {
+      // Otherwise, save only remaining wrongs
+      final updatedExam = {
+        "id": existing["id"],
+        "title": existing["title"],
+        "questions": updatedQuestions,
+      };
 
-    debugPrint("🧹 Cleaned '$examKey' mistakes exam — now ${updatedQuestions.length} remain.");
+      await prefs.setString(
+        "exam_previous_mistakes_$examKey",
+        jsonEncode(updatedExam),
+      );
+
+      debugPrint("🧹 Cleaned '$examKey' mistakes exam — now ${updatedQuestions.length} remain.");
+    }
   }
+  Map<int, int?> get selectedAnswers {
+    if (state is ExamLoaded) {
+      return Map<int, int?>.from((state as ExamLoaded).selectedAnswers);
+    }
+    return {};
+  }
+
 
 }

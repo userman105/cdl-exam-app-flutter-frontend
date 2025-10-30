@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/widgets.dart';
 import '../constants/constants.dart';
 import '../blocs/exam_cubit.dart';
-
+import 'package:arabic_font/arabic_font.dart';
 // =====================
 // General Knowledge Dashboard
 // =====================
@@ -53,8 +53,8 @@ class _GeneralKnowledgeDashboardState extends State<GeneralKnowledgeDashboard>
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "General Knowledge",
-          style: GoogleFonts.robotoSlab(fontWeight: FontWeight.w500, fontSize: 16),
+          "معلومات عامة",
+          style: ArabicTextStyle(arabicFont: ArabicFont.dubai,fontWeight: FontWeight.w500, fontSize: 23),
         ),
         actions: [
           IconButton(
@@ -105,14 +105,14 @@ class _GeneralKnowledgeDashboardState extends State<GeneralKnowledgeDashboard>
         Image.asset("assets/icons/the_star.png", width: 40, height: 40),
         const SizedBox(width: 12),
         CustomTabButton(
-          text: "Questions Bank",
+          text: "بنك الاسئلة",
           isActive: _tabController.index == 0,
           onTap: () => _tabController.animateTo(0),
           underlineWidth: 86,
         ),
         const SizedBox(width: 12),
         CustomTabButton(
-          text: "Exams",
+          text: "الامتحانات",
           isActive: _tabController.index == 1,
           onTap: () => _tabController.animateTo(1),
           underlineWidth: 50,
@@ -187,26 +187,88 @@ class _GeneralKnowledgeQuestionsTabState extends State<GeneralKnowledgeQuestions
   Widget _buildQuestionPage(List<dynamic> questions, int index, ExamLoaded state) {
     final question = questions[index];
     final answers = question["answers"] as List<dynamic>;
-    final qid = question["questionId"];
-    final selected = state.selectedAnswers[qid];
+    final questionId = question["questionId"];
+    final selected = state.selectedAnswers[questionId];
 
     return Column(
       children: [
+        // 🇴🇲 Arabic comes FIRST (main interactive card)
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: _buildEnglishQuestionCard(question, answers, qid, selected),
+            child: _buildArabicQuestionCard(question, answers, questionId, selected),
           ),
         ),
-        ArabicExpansionCard(
+
+        // 🇺🇸 English is now the secondary expansion card
+        EnglishExpansionCard(
           question: question,
           answers: answers,
-          onTTSTap: () => _speakArabic(question, answers),
+          onTTSTap: () => _speakEnglish(question, answers),
         ),
+
         _buildShowAnswerButton(questions, index),
       ],
     );
   }
+
+  Widget _buildArabicQuestionCard(
+      Map<String, dynamic> question,
+      List<dynamic> answers,
+      int questionId,
+      int? selected,
+      ) {
+    return Card(
+      elevation: 4,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "س${_currentPage + 1}: ${question['questionTextAr'] ?? ''}",
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(height: 24),
+                    ...answers.map((ans) => AnswerOption(
+                      answer: {
+                        "answerId": ans["answerId"],
+                        "answerText": ans["answerTextAr"]
+                      },
+                      questionId: questionId,
+                      selectedAnswer: selected,
+                      showAnswer: _showAnswer,
+                      correctAnswerId: _getCorrectAnswerIdForGeneral(questionId),
+                      onTap: !_showAnswer
+                          ? () => context
+                          .read<ExamCubit>()
+                          .selectAnswer(questionId, ans["answerId"])
+                          : null,
+                    )),
+                  ],
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.volume_up_rounded, color: Colors.blueAccent),
+                onPressed: () => _speakArabic(question, answers),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildEnglishQuestionCard(
       Map<String, dynamic> question,
@@ -476,13 +538,13 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
                 const SizedBox(height: 20),
 
                 //  Dynamic Units
-                _buildNormalUnit(context, "Basics", questions, 0, 25.clamp(0, total)),
+                _buildNormalUnit(context, "الاساسيات", questions, 0, 25.clamp(0, total)),
                 const SizedBox(height: 20),
-                _buildNormalUnit(context, "Common Confusions", questions, 25, 50.clamp(0, total)),
+                _buildNormalUnit(context, "اخطاء شائعة", questions, 25, 50.clamp(0, total)),
                 const SizedBox(height: 20),
-                _buildNormalUnit(context, "Advanced Scenarios", questions, 50, 71.clamp(0, total)),
+                _buildNormalUnit(context, "اسئلة متقدمة", questions, 50, 71.clamp(0, total)),
                 const SizedBox(height: 20),
-                _buildNormalUnit(context, "Worst Scenarios", questions, 71, 95.clamp(0, total)),
+                _buildNormalUnit(context, "اسؤء السيناريوهات", questions, 71, 95.clamp(0, total)),
                 const SizedBox(height: 20),
 
                 _buildTimeAttackUnit(context, questions),
@@ -508,7 +570,7 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
       onTap: () async {
         final unitQuestions = allQuestions.sublist(start, end);
 
-        // ✅ Apply correct answer formula for general knowledge
+        //  Apply correct answer formula for general knowledge
         for (int i = 0; i < unitQuestions.length; i++) {
           final qIndex = start + i + 136; // general base
           unitQuestions[i]["correctAnswerId"] = 406 + (qIndex - 136);
@@ -519,12 +581,12 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
     );
   }
 
-  // 🔹 Time Attack Unit
+  //  Time Attack Unit
   Widget _buildTimeAttackUnit(BuildContext context, List<dynamic> allQuestions) {
     if (allQuestions.isEmpty) return const SizedBox.shrink();
 
     return UnitButton(
-      title: "⚡ Time Attack",
+      title: "امتحان ضد الزمن",
       questionCount: 20,
       progress: _unitProgressGeneral["Time Attack"] ?? 0.0,
       accentColor: kPrimaryColor,
@@ -534,9 +596,9 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
           context: context,
           builder: (context) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text("Time Attack Mode"),
+            title: const Text("امتحان ضدالوقت"),
             content: const Text(
-              "You'll have limited time to answer each question.\nReady to start?",
+              "لديك عشر ثواني لاجابة كل سؤال",
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
@@ -714,7 +776,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
       existing.add(question);
       final updatedExam = {
         "id": "mistakes_$examKey",
-        "title": "Previous Mistakes ($examKey)",
+        "title": "الاخطاء السابقة",
         "questions": existing.take(71).toList(),
       };
       await prefs.setString(key, jsonEncode(updatedExam));
@@ -865,9 +927,9 @@ class _GeneralKnowledgeUnitQuestionsScreenState
             children: [
               _headerStatusBox(),
               const SizedBox(height: 16),
-              _buildEnglishCard(question, answers),
-              const SizedBox(height: 16),
               _buildArabicCard(question, answers),
+              const SizedBox(height: 16),
+              _buildEnglishCard(question, answers),
             ],
           ),
         ),
@@ -879,24 +941,96 @@ class _GeneralKnowledgeUnitQuestionsScreenState
   Widget _buildEnglishCard(Map<String, dynamic> question, List<dynamic> answers) {
     return Card(
       elevation: 4,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF64B2EF)),
+                  onPressed: () => _speakQuestion(question),
+                ),
+                Expanded(
+                  child: Text(
+                    "English",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.robotoSlab(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: AnimatedRotation(
+                    turns: _isArabicExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                  ),
+                  onPressed: () => setState(() => _isArabicExpanded = !_isArabicExpanded),
+                ),
+              ],
+            ),
+            AnimatedCrossFade(
+              crossFadeState: _isArabicExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+              firstChild: const SizedBox.shrink(),
+              secondChild: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      question["questionText"] ?? "",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Divider(height: 20),
+                    ...answers.map((ans) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text(
+                        ans["answerText"] ?? "",
+                        style: const TextStyle(fontSize: 14, color: Colors.black54),
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildArabicCard(Map<String, dynamic> question, List<dynamic> answers) {
+    return Card(
+      elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              question["questionText"],
-              style: GoogleFonts.robotoSlab(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+              question["questionTextAr"] ?? "",
+              textDirection: TextDirection.rtl,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...answers.map((ans) {
               final isSelected = _selectedAnswerId == ans["answerId"];
-              final isCorrect = _showAnswer &&
-                  ans["answerId"] == _getCorrectAnswerId(question["questionId"]);
+              final isCorrect = _showAnswer && ans["answerId"] ==_getCorrectAnswerId(question["questionId"]);
               final isWrong = _showAnswer && isSelected && !isCorrect;
 
               return GestureDetector(
@@ -923,9 +1057,13 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                           : Colors.grey[300]!,
                     ),
                   ),
-                  child: Text(
-                    ans["answerText"],
-                    style: GoogleFonts.robotoSlab(fontSize: 16),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      ans["answerTextAr"] ?? "",
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(fontSize: 16),
+                    ),
                   ),
                 ),
               );
@@ -935,9 +1073,9 @@ class _GeneralKnowledgeUnitQuestionsScreenState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () => _speakQuestion(question),
+                  onPressed: () => _speakArabic(question),
                   icon: const Icon(Icons.volume_up),
-                  label: const Text("Read"),
+                  label: const Text("استمع"),
                 ),
                 SizedBox(
                   width: 160,
@@ -949,11 +1087,10 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _showAnswer
-                        ? _nextQuestion
-                        : () => _submitAnswer(question),
+                    onPressed:
+                    _showAnswer ? _nextQuestion : () => _submitAnswer(question),
                     child: Text(
-                      _showAnswer ? "Next" : "Submit",
+                      _showAnswer ? "التالي" : "تاكيد",
                       style: GoogleFonts.robotoSlab(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -970,84 +1107,6 @@ class _GeneralKnowledgeUnitQuestionsScreenState
     );
   }
 
-  Widget _buildArabicCard(Map<String, dynamic> question, List<dynamic> answers) {
-    return Card(
-      elevation: 4,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF64B2EF)),
-                  onPressed: () => _speakArabic(question),
-                ),
-                Expanded(
-                  child: Text(
-                    "العربية",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.robotoSlab(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: AnimatedRotation(
-                    turns: _isArabicExpanded ? 0.5 : 0.0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.keyboard_arrow_down_rounded),
-                  ),
-                  onPressed: () =>
-                      setState(() => _isArabicExpanded = !_isArabicExpanded),
-                ),
-              ],
-            ),
-            AnimatedCrossFade(
-              crossFadeState: _isArabicExpanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              duration: const Duration(milliseconds: 200),
-              firstChild: const SizedBox.shrink(),
-              secondChild: Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      question["questionTextAr"],
-                      textDirection: TextDirection.rtl,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const Divider(height: 20),
-                    ...answers.map(
-                          (ans) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            ans["answerTextAr"],
-                            textDirection: TextDirection.rtl,
-                            style: const TextStyle(fontSize: 14, color: Colors.black54),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _headerStatusBox() {
     final progress = (_currentIndex + 1) / widget.questions.length;

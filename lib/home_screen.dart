@@ -11,6 +11,7 @@ import 'first_screen.dart';
 import 'profile_edit.dart';
 import 'airbrakes_dashboard.dart';
 import 'general_dashboard.dart';
+import 'package:arabic_font/arabic_font.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -197,7 +198,7 @@ class HomeScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildButton(
-                    label: "General information",
+                    label: "معلومات عامة",
                     iconPath: "assets/icons/general.svg",
                     onTap: () => _loadExamAndNavigate(
                       context: context,
@@ -208,7 +209,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
                   _buildButton(
-                    label: "Air brakes",
+                    label: "الفرامل الهوائية",
                     iconPath: "assets/icons/air_brakes.svg",
                     onTap: () => _loadExamAndNavigate(
                       context: context,
@@ -219,7 +220,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
                   _buildButton(
-                    label: "Tractors and trailers",
+                    label: "الجرار و المقطورات ",
                     iconPath: "assets/icons/tractors_and_trailers.svg",
                     onTap: () => _loadExamAndNavigate(
                       context: context,
@@ -264,7 +265,7 @@ class HomeScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'Register now and enjoy all features',
+                                'قم بالتسجيل للاستمتاع بعروض التطبيق',
                                 style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -310,18 +311,19 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            SvgPicture.asset(iconPath, height: 50, width: 50),
-            const SizedBox(width: 10),
             Text(
               label,
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
+              style: ArabicTextStyle(arabicFont: ArabicFont.dubai,
+                  fontSize: 20, fontWeight: FontWeight.w500,color: Colors.black),
             ),
+
+
+            SizedBox(width: 25,),
+
+            SvgPicture.asset(iconPath, height: 50, width: 50),
+            const SizedBox(width: 10),
           ],
         ),
       ),
