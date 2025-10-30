@@ -1,18 +1,20 @@
 import 'dart:async';
+import 'package:cdl_flutter/first_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'home_screen.dart';
 import 'blocs/auth_cubit.dart';
+import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 
 class VerifyOtpScreen extends StatefulWidget {
   final String email;
-  final String password;
+  final String?password;
 
   const VerifyOtpScreen({
     super.key,
     required this.email,
-    required this.password,
+    this.password,
   });
 
   @override
@@ -242,45 +244,55 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                     ),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  onPressed: () async {
-                    final authCubit = context.read<AuthCubit>();
-                    final messenger = ScaffoldMessenger.of(context);
-                    final nav = Navigator.of(context);
+                    onPressed: () async {
+                      final authCubit = context.read<AuthCubit>();
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(context);
 
-                    final result = await authCubit.verifyEmail(
-                      email: currentEmail,
-                      otp: otpController.text,
-                    );
-
-                    if (!mounted) return;
-
-                    if (result["success"] == true) {
-                      messenger.showSnackBar(
-                        const SnackBar(
-                            content: Text("Email verified! Logging you in...")),
-                      );
-
-                      await authCubit.login(
+                      final result = await authCubit.verifyEmail(
                         email: currentEmail,
-                        password: widget.password,
+                        otp: otpController.text,
                       );
 
                       if (!mounted) return;
 
-                      nav.pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                            (route) => false,
-                      );
-                    } else {
-                      messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            result["error"] ?? "Invalid OTP, please try again",
+                      if (result["success"] == true) {
+                        final successSnackBar = SnackBar(
+                          elevation: 0,
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: Colors.transparent,
+                          content: AwesomeSnackbarContent(
+                            title: 'Account Created!',
+                            message: 'Your account has been verified successfully.',
+                            contentType: ContentType.success,
                           ),
-                        ),
-                      );
-                    }
-                  },
+                        );
+
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(successSnackBar);
+
+                        nav.pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const SplashScreen()),
+                              (route) => false,
+                        );
+                      } else {
+                        final errorSnackBar = SnackBar(
+                          elevation: 0,
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: Colors.transparent,
+                          content: AwesomeSnackbarContent(
+                            title: 'Oops!',
+                            message: result["error"] ?? "Invalid OTP, please try again.",
+                            contentType: ContentType.failure,
+                          ),
+                        );
+
+                        messenger
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(errorSnackBar);
+                      }
+                    },
                   child: Text(
                     "Verify",
                     style: GoogleFonts.robotoSlab(fontSize: 18),

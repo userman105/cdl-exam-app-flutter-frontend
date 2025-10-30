@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 /// =====================
 /// Auth States
@@ -45,9 +46,9 @@ class AuthGuest extends AuthState {}
 
 class AuthNeedsVerification extends AuthState {
   final String email;
-  final String password; // add this
+  final String ?password; // add this
 
-  AuthNeedsVerification({required this.email, required this.password});
+  AuthNeedsVerification({required this.email, this.password});
 }
 
 /// =====================
@@ -76,7 +77,7 @@ class AuthCubit extends Cubit<AuthState> {
   /// Login
   Future<void> login({
     required String email,
-    required String password,
+    required String ?password,
   }) async {
     emit(AuthLoading());
 
@@ -226,7 +227,6 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-
   Future<Map<String, dynamic>> registerUser({
     required String fName,
     required String lName,
@@ -236,19 +236,44 @@ class AuthCubit extends Cubit<AuthState> {
     String? mobileNumber,
   }) async {
     try {
-      final response = await _dio.post("/register", data: {
-        "fName": fName,
-        "lName": lName,
-        "userName": userName,
-        "email": email,
-        "password": password,
-        "mobileNumber": mobileNumber ?? "",
-      });
+      final response = await _dio.post(
+        "/register",
+        data: {
+          "fName": fName,
+          "lName": lName,
+          "userName": userName,
+          "email": email,
+          "password": password,
+          "mobileNumber": mobileNumber ?? "",
+        },
+      );
+
       return response.data;
+    } on DioException catch (e) {
+      String message = "Registration failed. Please try again.";
+
+      if (e.response != null) {
+        if (e.response?.statusCode == 400) {
+          message = e.response?.data["message"] ??
+              "This email is already registered. Please use another one.";
+        } else if (e.response?.statusCode == 409) {
+          message = "This email is already registered. Please use another one.";
+        } else {
+          message = e.response?.data["message"] ??
+              "An error occurred: ${e.response?.statusMessage}";
+        }
+      } else if (e.type == DioExceptionType.connectionTimeout) {
+        message = "Connection timed out. Please try again.";
+      } else if (e.type == DioExceptionType.connectionError) {
+        message = "No internet connection. Please check your network.";
+      }
+
+      return {"success": false, "error": message};
     } catch (e) {
-      return {"success": false, "error": e.toString()};
+      return {"success": false, "error": "Unexpected error occurred."};
     }
   }
+
 
 
   Future<Map<String, dynamic>> verifyEmail({
@@ -376,6 +401,93 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
+
+  Future<void> registerWithGoogle() async {
+    emit(AuthLoading());
+
+    final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email']);
+
+    try {
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        emit(AuthError("Google sign-in cancelled"));
+        return;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null) {
+        emit(AuthError("Failed to get Google ID token"));
+        return;
+      }
+
+      final email = googleUser.email;
+      final fName = email.split('@').first;
+      const lName = '';
+      final userName = fName;
+
+      final response = await _dio.post(
+        "/auth/google/callback",
+        data: {"id_token": idToken},
+        options: Options(validateStatus: (status) => true),
+      );
+
+      final data = response.data;
+
+      // ✅ Successful verified login
+      if (response.statusCode == 200 && data["token"] != null) {
+        final token = data["token"]["token"];
+        final username = data["user"]["userName"] ?? fName;
+
+        await _storage.write(key: "auth_token", value: token);
+        googleLogin(username, token);
+        return;
+      }
+
+      // ✅ Unverified Google account → redirect to VerifyOtpScreen
+      if (response.statusCode == 202 ||
+          data["needs_verification"] == true ||
+          (data["message"] ?? "").toString().toLowerCase().contains("verify")) {
+        emit(AuthNeedsVerification(email: email, password: ""));
+        return;
+      }
+
+      // ✅ Backend explicitly says verify first (403)
+      if (response.statusCode == 403) {
+        final msg = (data["error"] ?? data["message"] ?? "").toString().toLowerCase();
+        if (msg.contains("verify") || msg.contains("unverified")) {
+          emit(AuthNeedsVerification(email: email, password: ""));
+          return;
+        }
+      }
+
+      // ✅ Fallback for 401 → register new Google user
+      if (response.statusCode == 401) {
+        final registerResult = await registerUser(
+          fName: fName,
+          lName: lName,
+          userName: userName,
+          email: email,
+          password: '',
+        );
+
+        if (registerResult["success"] == true) {
+          emit(AuthNeedsVerification(email: email, password: ""));
+        } else {
+          emit(AuthError(
+            registerResult["message"] ?? "Google registration failed",
+          ));
+        }
+        return;
+      }
+
+      emit(AuthError("Google login failed: ${response.data}"));
+    } catch (e) {
+      emit(AuthError("Google sign-in error: $e"));
+    } finally {
+      await googleSignIn.signOut();
+    }
+  }
 
 
 }

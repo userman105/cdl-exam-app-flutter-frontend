@@ -35,49 +35,13 @@ class _LoginPageState extends State<LoginPage> {
 
   /// Google Sign-In (unchanged)
   Future<void> _signInWithGoogle(BuildContext context) async {
-    try {
-      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
-      await googleSignIn.signOut();
-      final account = await googleSignIn.signIn();
-
-      if (account == null) return;
-
-      final auth = await account.authentication;
-      final idToken = auth.idToken;
-      if (idToken == null) return;
-
-      final response = await http.post(
-        Uri.parse("http://10.0.2.2:3333/auth/google/callback"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"id_token": idToken}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        final username = data["user"]["userName"] ?? "User";
-        final token = data["token"]["token"];
-
-        context.read<AuthCubit>().googleLogin(username, token);
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Google login failed: ${response.body}")),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
-    }
+    context.read<AuthCubit>().registerWithGoogle();
   }
 
+
+
   /// Email/password login
-  void _loginWithBackend(BuildContext context) {
+  void _loginWithBackend(BuildContext context) async {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
@@ -93,11 +57,38 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    context.read<AuthCubit>().login(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse("http://10.0.2.2:3333/auth/check-user"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+
+      if (response.statusCode == 200) {
+        final user = jsonDecode(response.body);
+
+        if (user["password"] == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("This account was created with Google. Please use the Google button instead."),
+            ),
+          );
+          return;
+        }
+      }
+
+      // Continue normal login
+      context.read<AuthCubit>().login(
+        email: email,
+        password: password,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login error: $e")),
+      );
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
