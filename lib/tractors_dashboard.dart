@@ -731,12 +731,12 @@ class UnitQuestionsScreen extends StatefulWidget {
           final decoded = jsonDecode(saved);
           _mistakeCache.add(decoded);
         } catch (e) {
-          debugPrint("⚠️ Skipped invalid cache entry $key: $e");
+          debugPrint(" Skipped invalid cache entry $key: $e");
         }
       }
     }
 
-    debugPrint("📦 Loaded ${_mistakeCache.length} cached mistake exams at startup.");
+    debugPrint(" Loaded ${_mistakeCache.length} cached mistake exams at startup.");
   }
 
   final String title;

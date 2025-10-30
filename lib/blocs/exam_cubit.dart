@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../services/cache_service.dart';
 part 'exam_state.dart';
 
 class ExamCubit extends Cubit<ExamState> {
@@ -15,6 +15,30 @@ class ExamCubit extends Cubit<ExamState> {
   Future<void> loadExam(BuildContext context, int examId) async {
     emit(ExamLoading());
 
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString("exam_$examId");
+
+
+    if (cached != null) {
+      try {
+        final data = jsonDecode(cached);
+        emit(ExamLoaded(examData: data, selectedAnswers: {}));
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("Loaded exam from cache"),
+              backgroundColor: Colors.blue[700],
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (_) {
+        debugPrint("⚠ Corrupted cache for exam_$examId");
+      }
+    }
+
+    // 2️⃣ Try fetching fresh data in background
     try {
       final response = await http
           .get(Uri.parse('http://10.0.2.2:3333/exam-attempts/$examId'))
@@ -22,44 +46,30 @@ class ExamCubit extends Cubit<ExamState> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString("exam_$examId", jsonEncode(data));
 
         emit(ExamLoaded(examData: data, selectedAnswers: {}));
+        debugPrint(" Exam $examId refreshed from network");
       } else {
-        emit(ExamError("Failed to fetch exam: ${response.statusCode}"));
+        if (state is! ExamLoaded) {
+          emit(ExamError("Failed to fetch exam: ${response.statusCode}"));
+        }
       }
     } on TimeoutException {
-      emit(ExamError("Request timed out. Please check your internet connection."));
-    } catch (e) {
-      debugPrint("loadExam failed: $e");
-
-      final prefs = await SharedPreferences.getInstance();
-      final cached = prefs.getString("exam_$examId");
-
-      if (cached != null) {
-        try {
-          final data = jsonDecode(cached);
-          emit(ExamLoaded(examData: data, selectedAnswers: {}));
-
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text("Loaded exam from cache"),
-                backgroundColor: Colors.orange[700],
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        } catch (_) {
-          emit(ExamError("Cache corrupted, please reconnect to the internet."));
-        }
+      if (state is! ExamLoaded) {
+        emit(ExamError("Request timed out. Please check your connection."));
       } else {
-        emit(ExamError("No cached exam found and failed to fetch online."));
+        debugPrint("️ Timeout ignored because cache was already loaded");
+      }
+    } catch (e) {
+      if (state is! ExamLoaded) {
+        emit(ExamError("Failed to load exam: $e"));
+      } else {
+        debugPrint("⚠ Network error ignored (using cache)");
       }
     }
   }
+
 
   void selectAnswer(int questionId, int answerId) {
     if (state is ExamLoaded) {
@@ -103,7 +113,7 @@ class ExamCubit extends Cubit<ExamState> {
         final existing = jsonDecode(saved);
         existingMistakes = (existing["questions"] as List?) ?? [];
       } catch (_) {
-        debugPrint("⚠️ Corrupted previous mistakes data for $examKey, resetting.");
+        debugPrint(" Corrupted previous mistakes data for $examKey, resetting.");
       }
     }
 
@@ -132,7 +142,7 @@ class ExamCubit extends Cubit<ExamState> {
     );
 
     debugPrint(
-      "✅ Saved persistent 'Previous Mistakes ($examKey)' with "
+      " Saved persistent 'Previous Mistakes ($examKey)' with "
           "${mergedQuestions.length} questions.",
     );
   }
@@ -188,14 +198,14 @@ class ExamCubit extends Cubit<ExamState> {
       if (selected == null || correct == null || selected != correct) {
         updatedQuestions.add(q);
       } else {
-        debugPrint("✅ Removing question $qid (answered correctly)");
+        debugPrint(" Removing question $qid (answered correctly)");
       }
     }
 
     // If all are correct → delete mistakes exam entirely
     if (updatedQuestions.isEmpty) {
       await prefs.remove("exam_previous_mistakes_$examKey");
-      debugPrint("🎉 All mistakes fixed for '$examKey' — exam removed.");
+      debugPrint(" All mistakes fixed for '$examKey' — exam removed.");
     } else {
       // Otherwise, save only remaining wrongs
       final updatedExam = {

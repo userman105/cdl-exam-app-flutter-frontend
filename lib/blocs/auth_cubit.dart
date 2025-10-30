@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 /// =====================
 /// Auth States
@@ -199,6 +201,9 @@ class AuthCubit extends Cubit<AuthState> {
         "/logout",
         options: Options(headers: {"Authorization": "Bearer $token"}),
       );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear(); // or selectively delete dashboard_* and exam_* keys
+
     } catch (_) {}
 
     await _storage.delete(key: "auth_token");
@@ -434,7 +439,6 @@ class AuthCubit extends Cubit<AuthState> {
 
       final data = response.data;
 
-      // ✅ Successful verified login
       if (response.statusCode == 200 && data["token"] != null) {
         final token = data["token"]["token"];
         final username = data["user"]["userName"] ?? fName;
@@ -444,7 +448,6 @@ class AuthCubit extends Cubit<AuthState> {
         return;
       }
 
-      // ✅ Unverified Google account → redirect to VerifyOtpScreen
       if (response.statusCode == 202 ||
           data["needs_verification"] == true ||
           (data["message"] ?? "").toString().toLowerCase().contains("verify")) {
@@ -452,7 +455,6 @@ class AuthCubit extends Cubit<AuthState> {
         return;
       }
 
-      // ✅ Backend explicitly says verify first (403)
       if (response.statusCode == 403) {
         final msg = (data["error"] ?? data["message"] ?? "").toString().toLowerCase();
         if (msg.contains("verify") || msg.contains("unverified")) {
@@ -461,7 +463,6 @@ class AuthCubit extends Cubit<AuthState> {
         }
       }
 
-      // ✅ Fallback for 401 → register new Google user
       if (response.statusCode == 401) {
         final registerResult = await registerUser(
           fName: fName,
