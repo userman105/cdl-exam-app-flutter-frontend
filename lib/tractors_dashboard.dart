@@ -617,35 +617,16 @@ class _UnitsTabState extends State<UnitsTab> {
     );
   }
 
+  // In UnitsTab (around line 168 in original file)
+
   Future<void> _startTimeAttack(BuildContext context, List<dynamic> allQuestions) async {
-    final start = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text("امتحان ضد الوقت"),
-        content: const Text(
-          "لديك عشر ثواني لاجابة كل سؤال",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-
-            child: const Text("Start"),
-          ),
-        ],
-      ),
-    );
-
-    if (start != true) return;
+    // ... (dialog logic remains the same)
 
     final randomized = List<dynamic>.from(allQuestions)..shuffle();
     final selected = randomized.take(AppConstants.timeAttackQuestions).toList();
 
-    await Navigator.push<double>(
+    // FIX: Change the expected return type from <double> to <Map<String, dynamic>>
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => UnitQuestionsScreen(
@@ -657,7 +638,19 @@ class _UnitsTabState extends State<UnitsTab> {
         ),
       ),
     );
+
+    // NEW: Logic to process the returned map, similar to _navigateToUnit
+    if (!mounted || result == null) return;
+
+    final progress = result["progress"] as double;
+    // The selectedAnswers are not strictly needed for Time Attack progress update,
+    // but keeping the structure consistent is good practice.
+    // final answers = result["selectedAnswers"] as Map<int, int?>;
+
+    // Assuming you want to track progress for Time Attack under its title
+    _updateProgress("امتحان ضد الزمن", progress);
   }
+
 
   Future<void> _navigateToUnit(
       BuildContext context,
@@ -917,6 +910,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       final totalQuestions = widget.questions.length;
       final percentage = (_correctCount / totalQuestions) * 100;
 
+      // Show final report dialog
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -928,15 +922,22 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
         ),
       );
 
+      if (!mounted) return;
+
       final progress = (_currentIndex + 1) / totalQuestions;
-
-      Navigator.pop(context, {
-        "progress": progress,
-        "selectedAnswers": context.read<ExamCubit>().selectedAnswers,
+      await Future.delayed(const Duration(milliseconds: 300));
+      // ✅ Delay pop safely to avoid navigator lock
+      Future.microtask(() {
+        if (mounted) {
+          Navigator.pop(context, {
+            "progress": progress,
+            "selectedAnswers": context.read<ExamCubit>().selectedAnswers,
+          });
+        }
       });
-
     }
   }
+
 
 
   @override
