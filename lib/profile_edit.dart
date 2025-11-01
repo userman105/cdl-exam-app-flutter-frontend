@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'blocs/auth_cubit.dart';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'saved_reports.dart';
+import 'blocs/exam_cubit.dart';
 
 class ProfileEdit extends StatelessWidget {
   const ProfileEdit({super.key});
@@ -194,6 +195,39 @@ class ProfileEdit extends StatelessWidget {
                       },
 
                   ),
+
+                  const SizedBox(height: 24),
+                  _buildOption(
+                    label: "Clear Past Exams",
+                    iconPath: "assets/icons/delete.svg", // use any delete/trash svg
+                    labelColor: Colors.redAccent,
+                    onTap: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          title: const Text("Confirm Reset"),
+                          content: const Text("Are you sure you want to clear all saved exams and mistakes?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text("Cancel"),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                              child: const Text("Clear"),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        await context.read<ExamCubit>().clearAllSavedExams(context);
+                      }
+                    },
+                  ),
+
                   const SizedBox(height: 24),
                   _buildOption(
                     label: "Logout",

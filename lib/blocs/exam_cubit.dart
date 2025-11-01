@@ -229,5 +229,30 @@ class ExamCubit extends Cubit<ExamState> {
     return {};
   }
 
+  Future<void> clearAllSavedExams(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final allKeys = prefs.getKeys();
+
+    // Only remove keys related to exams or mistakes
+    final removed = <String>[];
+    for (final key in allKeys) {
+      if (key.startsWith("exam_") || key.startsWith("exam_previous_mistakes_")) {
+        await prefs.remove(key);
+        removed.add(key);
+      }
+    }
+
+    debugPrint("🧹 Cleared ${removed.length} saved exam entries.");
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Cleared ${removed.length} saved exams and mistakes."),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
 
 }
