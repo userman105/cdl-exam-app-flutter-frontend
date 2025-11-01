@@ -1,3 +1,5 @@
+import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'package:cdl_flutter/first_screen.dart';
 import 'package:cdl_flutter/verify_otp_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -41,17 +43,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // IMPORTANT: BlocListener is placed INSIDE the Scaffold body so the listener's context can find a ScaffoldMessenger.
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: BlocListener<AuthCubit, AuthState>(
           listener: (context, state) {
-            // debug print so you can verify listener is triggered
             debugPrint('Auth state changed in RegisterScreen listener: $state');
 
             if (state is AuthNeedsVerification) {
-              // navigate to OTP screen (use push)
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -62,18 +61,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               );
             } else if (state is AuthAuthenticated) {
-              // show welcome message
-              ScaffoldMessenger.of(context)
+              final messenger = ScaffoldMessenger.of(context);
+
+              // Check if the backend or cubit provided info about existing email
+              final bool isExisting = state.isExistingUser ?? false;
+
+              final successSnackBar = SnackBar(
+                elevation: 0,
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.transparent,
+                content: AwesomeSnackbarContent(
+                  title: isExisting ? 'Already Registered!' : 'Account Created!',
+                  message: isExisting
+                      ? 'This email is already registered. Please sign in instead.'
+                      : 'Your account has been created successfully.',
+                  contentType: isExisting ?  ContentType.warning : ContentType.success,
+                ),
+                duration: const Duration(seconds: 2),
+              );
+
+              messenger
                 ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: const Text("this email is already registered"),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
+                ..showSnackBar(successSnackBar);
+
+              Future.delayed(const Duration(seconds: 2), () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SplashScreen()),
+                      (route) => false,
                 );
-            } else if (state is AuthError) {
-              // show a styled floating snack bar for errors
+              });
+            }
+            else if (state is AuthError) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
                 ..showSnackBar(

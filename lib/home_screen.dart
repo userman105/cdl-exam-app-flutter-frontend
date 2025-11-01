@@ -166,30 +166,50 @@ class HomeScreen extends StatelessWidget {
             ),
 
             // Profile button
+            // Profile button (✅ fixed to use authState.photoUrl directly)
             Positioned(
               top: 40,
               right: 20,
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BlocProvider.value(
-                        value: context.read<AuthCubit>(),
-                        child: const ProfileEdit(),
-                      ),
+              child: BlocBuilder<AuthCubit, AuthState>(
+                builder: (context, authState) {
+                  String? photoUrl;
+
+                  if (authState is AuthAuthenticated) {
+                    photoUrl = authState.photoUrl;
+                  }
+
+                  return InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BlocProvider.value(
+                            value: context.read<AuthCubit>(),
+                            child: const ProfileEdit(),
+                          ),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(40),
+                    child: CircleAvatar(
+                      radius: 36,
+                      backgroundColor: Colors.white,
+                      backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                          ? NetworkImage(photoUrl)
+                          : null,
+                      child: (photoUrl == null || photoUrl.isEmpty)
+                          ? SvgPicture.asset(
+                        "assets/icons/profile.svg",
+                        width: 40,
+                        height: 40,
+                      )
+                          : null,
                     ),
                   );
                 },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  padding: const EdgeInsets.all(12),
-                  child: SvgPicture.asset("assets/icons/profile.svg"),
-                ),
               ),
             ),
+
 
             // Buttons
             Align(

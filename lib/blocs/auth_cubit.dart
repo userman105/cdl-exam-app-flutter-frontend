@@ -18,26 +18,35 @@ class AuthLoading extends AuthState {}
 class AuthAuthenticated extends AuthState {
   final String username;
   final String token;
-  final String? profilePath;
+  final String? profilePath; // local image (from gallery)
+  final String? photoUrl; // remote image (from backend or Google)
+  final bool? isExistingUser;
 
   AuthAuthenticated({
     required this.username,
     required this.token,
     this.profilePath,
+    this.photoUrl,
+    this.isExistingUser,
   });
 
   AuthAuthenticated copyWith({
     String? username,
     String? token,
     String? profilePath,
+    String? photoUrl,
+    bool? isExistingUser,
   }) {
     return AuthAuthenticated(
       username: username ?? this.username,
       token: token ?? this.token,
       profilePath: profilePath ?? this.profilePath,
+      photoUrl: photoUrl ?? this.photoUrl,
+      isExistingUser: isExistingUser ?? this.isExistingUser,
     );
   }
 }
+
 
 class AuthError extends AuthState {
   final String message;
@@ -121,10 +130,11 @@ class AuthCubit extends Cubit<AuthState> {
 
         if (token != null) {
           await _storage.write(key: "auth_token", value: token);
-          loginSuccess(username, token);
+          await fetchUserProfile();
         } else {
           emit(AuthError("Invalid response: token missing"));
         }
+
         return;
       }
 
@@ -439,30 +449,66 @@ class AuthCubit extends Cubit<AuthState> {
 
       final data = response.data;
 
+      // ✅ Existing user (already registered)
       if (response.statusCode == 200 && data["token"] != null) {
         final token = data["token"]["token"];
-        final username = data["user"]["userName"] ?? fName;
-
         await _storage.write(key: "auth_token", value: token);
-        googleLogin(username, token);
+
+        final profileResult = await fetchUserProfile();
+
+        if (profileResult["success"] == true) {
+          final user = profileResult["user"];
+          final username = user["userName"] ?? fName;
+          final photoUrl = user["googlePhotoUrl"];
+
+          emit(AuthAuthenticated(
+            username: username,
+            token: token,
+            photoUrl: photoUrl,
+            isExistingUser: true, // ⚠️ Existing user
+          ));
+        } else {
+          emit(AuthError("Failed to fetch user profile after Google login"));
+        }
         return;
       }
 
+      // ✅ New user (registered now via Google)
+      if (response.statusCode == 201 ||
+          (data["message"] ?? "").toString().toLowerCase().contains("created")) {
+        final token = data["token"]?["token"];
+        if (token != null) await _storage.write(key: "auth_token", value: token);
+
+        final profileResult = await fetchUserProfile();
+        if (profileResult["success"] == true) {
+          final user = profileResult["user"];
+          final username = user["userName"] ?? fName;
+          final photoUrl = user["googlePhotoUrl"];
+
+          emit(AuthAuthenticated(
+            username: username,
+            token: token ?? "",
+            photoUrl: photoUrl,
+            isExistingUser: false, // ✅ New user
+          ));
+        } else {
+          emit(AuthError("Failed to fetch user profile after registration"));
+        }
+        return;
+      }
+
+      // Needs verification or similar backend hints
       if (response.statusCode == 202 ||
           data["needs_verification"] == true ||
-          (data["message"] ?? "").toString().toLowerCase().contains("verify")) {
+          (data["message"] ?? "")
+              .toString()
+              .toLowerCase()
+              .contains("verify")) {
         emit(AuthNeedsVerification(email: email, password: ""));
         return;
       }
 
-      if (response.statusCode == 403) {
-        final msg = (data["error"] ?? data["message"] ?? "").toString().toLowerCase();
-        if (msg.contains("verify") || msg.contains("unverified")) {
-          emit(AuthNeedsVerification(email: email, password: ""));
-          return;
-        }
-      }
-
+      //  Unauthorized → try manual registration fallback
       if (response.statusCode == 401) {
         final registerResult = await registerUser(
           fName: fName,
@@ -489,6 +535,68 @@ class AuthCubit extends Cubit<AuthState> {
       await googleSignIn.signOut();
     }
   }
+
+
+
+  /// =====================
+  /// Fetch current user info (from /me endpoint)
+  /// =====================
+  Future<Map<String, dynamic>> fetchUserProfile() async {
+    try {
+      final token = await _storage.read(key: "auth_token");
+      if (token == null) {
+        emit(AuthError("No token found. Please log in again."));
+        return {"success": false, "error": "Token missing"};
+      }
+
+      emit(AuthLoading());
+
+      final response = await _dio.get(
+        "/me",
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final user = data["user"];
+
+        final username = user["userName"] ?? "User";
+        final photoUrl = user["photoUrl"] ?? user["googlePhotoUrl"];
+
+        print("✅ Loaded user photo URL: $photoUrl");
+
+        final updatedState = AuthAuthenticated(
+          username: username,
+          token: token,
+          photoUrl: photoUrl,
+        );
+
+        _lastAuthenticated = updatedState;
+        emit(updatedState);
+
+        return {
+          "success": true,
+          "user": user,
+          "requestedAt": data["requestedAt"],
+        };
+      } else {
+        emit(AuthError(response.data["error"] ?? "Failed to fetch user"));
+        return {
+          "success": false,
+          "error": response.data["error"] ?? "Unknown error",
+        };
+      }
+    } on DioException catch (e) {
+      final msg = e.response?.data?["error"] ?? e.message;
+      emit(AuthError("Fetch user failed: $msg"));
+      return {"success": false, "error": msg};
+    } catch (e) {
+      emit(AuthError("Unexpected error: $e"));
+      return {"success": false, "error": e.toString()};
+    }
+  }
+
+
 
 
 }

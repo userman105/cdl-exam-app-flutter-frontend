@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:cdl_flutter/first_screen.dart';
 import 'package:cdl_flutter/signIn_screen.dart';
@@ -6,23 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
-import 'blocs/auth_cubit.dart';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'saved_reports.dart';
+import 'blocs/auth_cubit.dart';
 import 'blocs/exam_cubit.dart';
 
 class ProfileEdit extends StatelessWidget {
   const ProfileEdit({super.key});
-
-  Future<void> _pickImage(BuildContext context) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      context.read<AuthCubit>().updateProfilePhoto(pickedFile.path);
-    }
-  }
 
   void _openSettingsDrawer(BuildContext context) {
     showModalBottomSheet(
@@ -63,32 +52,6 @@ class ProfileEdit extends StatelessWidget {
                 );
               },
             ),
-            // ListTile(
-            //   leading: const Icon(Icons.lock),
-            //   title: const Text("Update Password"),
-            //   onTap: () {
-            //     Navigator.pop(context);
-            //     // step 1: ask for old password
-            //     _showTextInputDialog(
-            //       context,
-            //       "Enter old password",
-            //           (oldPass) async {
-            //         // step 2: ask for new password
-            //         _showTextInputDialog(
-            //           context,
-            //           "Enter new password",
-            //               (newPass) async {
-            //             await context.read<AuthCubit>().updateProfile(
-            //               oldPassword: oldPass,
-            //               newPassword: newPass,
-            //             );
-            //           },
-            //         );
-            //       },
-            //     );
-            //   },
-            // ),
-
           ],
         );
       },
@@ -98,177 +61,168 @@ class ProfileEdit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthCubit>().state;
-
     final bool isGuest = authState is AuthGuest;
-    final String? profilePath =
-    !isGuest && authState is AuthAuthenticated ? authState.profilePath : null;
+    final String? photoUrl =
+    !isGuest && authState is AuthAuthenticated ? authState.photoUrl : null;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Stack(
-          children: [
-
-            Positioned(
-              top: 146,
-              left: 25, // moved to the left
-              child: InkWell(
-                onTap: () {
-                  if (!isGuest) {
-                    _pickImage(context);
-                  }
-                },
-                borderRadius: BorderRadius.circular(40),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-
-                    Stack(
-                      alignment: Alignment.center,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // Profile header
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        "assets/icons/hex.svg",
+                        width: 120,
+                        height: 120,
+                      ),
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                            ? NetworkImage(photoUrl)
+                            : null,
+                        child: (photoUrl == null || photoUrl.isEmpty)
+                            ? SvgPicture.asset(
+                          "assets/icons/profile.svg",
+                          width: 70,
+                          height: 70,
+                        )
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SvgPicture.asset(
-                          "assets/icons/hex.svg",
-                          width: 130,
-                          height: 130,
+                        Text(
+                          isGuest
+                              ? "Welcome Guest!"
+                              : "Welcome back, ${(authState as AuthAuthenticated).username}!",
+                          style: GoogleFonts.robotoSlab(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundImage:
-                          profilePath != null ? FileImage(File(profilePath)) : null,
-                          child: profilePath == null
-                              ? SvgPicture.asset(
-                            "assets/icons/profile.svg",
-                            width: 80,
-                            height: 80,
-                          )
-                              : null,
-                        ),
+                        const SizedBox(height: 4),
+                        if (!isGuest)
+                          Text(
+                            "Glad to see you again",
+                            style: GoogleFonts.robotoSlab(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w300,
+                              color: Colors.grey[600],
+                            ),
+                          ),
                       ],
                     ),
-
-                    const SizedBox(width: 16), // spacing between avatar and text
-
-                    // Text separate
-                    Text(
-                      isGuest ? "Welcome Guest!" : "Welcome Back!",
-                      style: GoogleFonts.robotoSlab(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w300,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-            ,
-
-            // Options in center
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildOption(
-                    label: "Profile",
-                    iconPath: "assets/icons/profile.svg",
-                    onTap: () {
-                     Navigator.push(context, MaterialPageRoute(builder: (_)=>ReportHistoryScreen()));
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  _buildOption(
-                    label: "More Settings",
-                    iconPath: "assets/icons/gear.svg",
-                      onTap: () {
-                        if (authState is AuthAuthenticated) {
-                          _openSettingsDrawer(context);
-                        } else if (authState is AuthGuest) {
-                          _showErrorSnack(context, "this option is not available in guest mode");
-                        } else {
-                          // If it's AuthError or AuthLoading but we *were* authenticated,
-                          // don’t block user. Just open drawer.
-                          if (authState is! AuthInitial) {
-                            _openSettingsDrawer(context);
-                          } else {
-                            _showErrorSnack(context, "error");
-                          }
-                        }
-                      },
-
-                  ),
-
-                  const SizedBox(height: 24),
-                  _buildOption(
-                    label: "Clear Past Exams",
-                    iconPath: "assets/icons/delete.svg", // use any delete/trash svg
-                    labelColor: Colors.redAccent,
-                    onTap: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          title: const Text("Confirm Reset"),
-                          content: const Text("Are you sure you want to clear all saved exams and mistakes?"),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text("Cancel"),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                              child: const Text("Clear"),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (confirm == true) {
-                        await context.read<ExamCubit>().clearAllSavedExams(context);
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 24),
-                  _buildOption(
-                    label: "Logout",
-                    iconPath: "assets/icons/logout.svg",
-                    labelColor: Colors.red,
-                    onTap: () async {
-                      print("AuthState: $authState");
-
-                      final authCubit = context.read<AuthCubit>();
-                      final state = authCubit.state;
-
-                      if (state is AuthGuest) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const SplashScreen()),
-                        );
-                      } else if (state is AuthAuthenticated) {
-                        await authCubit.logout();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const SplashScreen()),
-                        );
-                      }
-                    },
                   ),
                 ],
               ),
-            ),
 
-            // Save button at bottom
-            Positioned(
-              bottom: 24,
-              left: 24,
-              right: 24,
-              child: SizedBox(
+              const SizedBox(height: 60),
+
+              // Options buttons
+              _buildOption(
+                label: "Profile",
+                iconPath: "assets/icons/profile.svg",
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ReportHistoryScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+              _buildOption(
+                label: "More Settings",
+                iconPath: "assets/icons/gear.svg",
+                onTap: () {
+                  if (authState is AuthAuthenticated) {
+                    _openSettingsDrawer(context);
+                  } else if (authState is AuthGuest) {
+                    _showErrorSnack(context, "This option is not available in guest mode");
+                  } else {
+                    _showErrorSnack(context, "Error");
+                  }
+                },
+              ),
+              const SizedBox(height: 28),
+              _buildOption(
+                label: "Clear Past Exams",
+                iconPath: "assets/icons/gear.svg",
+                labelColor: Colors.redAccent,
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      title: const Text("Confirm Reset"),
+                      content: const Text(
+                          "Are you sure you want to clear all saved exams and mistakes?"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text("Cancel"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.redAccent),
+                          child: const Text("Clear"),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    await context.read<ExamCubit>().clearAllSavedExams(context);
+                  }
+                },
+              ),
+              const SizedBox(height: 28),
+              _buildOption(
+                label: "Logout",
+                iconPath: "assets/icons/logout.svg",
+                labelColor: Colors.red,
+                onTap: () async {
+                  final authCubit = context.read<AuthCubit>();
+                  final state = authCubit.state;
+                  if (state is AuthGuest) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SplashScreen()),
+                    );
+                  } else if (state is AuthAuthenticated) {
+                    await authCubit.logout();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SplashScreen()),
+                    );
+                  }
+                },
+              ),
+
+              const Spacer(),
+
+              SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3298CB),
                     shape: RoundedRectangleBorder(
@@ -285,8 +239,9 @@ class ProfileEdit extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -301,14 +256,14 @@ class ProfileEdit extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 280,
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 6,
               offset: const Offset(0, 3),
             ),
@@ -321,7 +276,7 @@ class ProfileEdit extends StatelessWidget {
               width: 28,
               height: 28,
             ),
-
+            const SizedBox(width: 16),
             Text(
               label,
               style: GoogleFonts.robotoSlab(
@@ -335,36 +290,7 @@ class ProfileEdit extends StatelessWidget {
       ),
     );
   }
-  Future<String?> _showJsonInputDialog(BuildContext context, String hint) async {
-    final controller = TextEditingController();
 
-    return showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Enter JSON"),
-          content: TextField(
-            controller: controller,
-            maxLines: 6,
-            decoration: InputDecoration(
-              hintText: hint,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text("Cancel"),
-              onPressed: () => Navigator.pop(context),
-            ),
-            ElevatedButton(
-              child: const Text("Submit"),
-              onPressed: () => Navigator.pop(context, controller.text),
-            ),
-          ],
-        );
-      },
-    );
-  }
   void _showErrorSnack(BuildContext context, String message) {
     final snackBar = SnackBar(
       behavior: SnackBarBehavior.floating,
@@ -422,7 +348,4 @@ class ProfileEdit extends StatelessWidget {
       },
     );
   }
-
-
-
 }
