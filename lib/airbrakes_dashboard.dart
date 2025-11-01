@@ -12,6 +12,7 @@ import '../widgets/widgets.dart';
 import '../constants/constants.dart';
 import '../blocs/exam_cubit.dart';
 import  'package:arabic_font/arabic_font.dart';
+import 'services/report_storage.dart';
 
 // =====================
 // Main Dashboard
@@ -600,10 +601,8 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text("امتحات ضد الوقت"),
-        content: const Text(
-          "لديك عشر ثواني لاجابة كل سؤال",
-        ),
+        title: const Text("امتحان ضد الوقت"),
+        content: const Text("لديك عشر ثواني لاجابة كل سؤال"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
           ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Start")),
@@ -616,7 +615,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
     final randomized = List<dynamic>.from(allQuestions)..shuffle();
     final selected = randomized.take(20).toList();
 
-    await Navigator.push<double>(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => AirbrakesUnitQuestionsScreen(
@@ -625,10 +624,24 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
           startIndex: 0,
           endIndex: selected.length,
           isTimed: true,
+          dashboardName: 'Airbrakes',
         ),
       ),
     );
+
+    if (!context.mounted) return;
+
+    if (result != null) {
+      final progress = result["progress"] as double? ?? 0.0;
+      final selectedAnswers = result["selectedAnswers"] as Map<int, int?>?;
+
+      _updateProgressAirbrakes("Time Attack", progress);
+
+      debugPrint("Time Attack progress: $progress");
+      debugPrint("Selected answers: $selectedAnswers");
+    }
   }
+
   Future<void> _navigateToUnit(
       BuildContext context,
       String title,
@@ -636,7 +649,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
       int start,
       int end,
       ) async {
-    final result = await Navigator.push<double>(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => AirbrakesUnitQuestionsScreen(
@@ -644,19 +657,30 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
           questions: questions,
           startIndex: start,
           endIndex: end,
+          dashboardName: "Airbrakes",
         ),
       ),
     );
 
+    if (!context.mounted) return;
 
-    if (result != null) _updateProgressAirbrakes(title, result);
+    if (result != null) {
+      final progress = result["progress"] as double? ?? 0.0;
+      final selectedAnswers = result["selectedAnswers"] as Map<int, int?>?;
 
+      _updateProgressAirbrakes(title, progress);
 
+      debugPrint("Airbrakes unit finished with progress: $progress");
+      debugPrint("Selected answers: $selectedAnswers");
+    }
+
+    // Refresh previous mistakes after returning
     setState(() {
       _mistakesExamFuture =
-          context.read<ExamCubit>().getPreviousMistakesExamData("airbrakes");
+          context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
     });
   }
+
 
 }
 
@@ -665,6 +689,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
 //----------------------------
 
 class AirbrakesUnitQuestionsScreen extends StatefulWidget {
+  final String dashboardName;
   final String title;
   final List<dynamic> questions;
   final int startIndex;
@@ -675,6 +700,7 @@ class AirbrakesUnitQuestionsScreen extends StatefulWidget {
 
   const AirbrakesUnitQuestionsScreen({
     Key? key,
+    required this.dashboardName,
     required this.title,
     required this.questions,
     required this.startIndex,
@@ -859,39 +885,70 @@ class _AirbrakesUnitQuestionsScreenState
   }
 
   Future<void> _nextQuestion() async {
+    // Reset per-question transient UI state
     _showAnswer = false;
     _selectedAnswerId = null;
     _isArabicExpanded = false;
     _remainingSeconds = 10;
 
+    // If there are remaining questions -> advance
     if (_currentIndex < widget.questions.length - 1) {
-      _currentIndex++;
-      if (widget.isTimed) _startTimer(widget.questions[_currentIndex]);
-    } else {
-      await _showResults();
+      setState(() {
+        _currentIndex++;
+        _selectedAnswerId = null;
+        _showAnswer = false;
+      });
+
+      // restart timer for the new question if timed mode
+      if (widget.isTimed) {
+        _startTimer(widget.questions[_currentIndex]);
+      }
+
       return;
     }
 
-    setState(() {});
-  }
+    // Otherwise we've reached the end -> finish exam
+    _questionTimer?.cancel();
 
-  Future<void> _showResults() async {
     final totalTime = DateTime.now().difference(_startTime);
-    final percentage = (_correctCount / widget.questions.length) * 100;
+    final totalQuestions = widget.questions.length;
+    final percentage = (totalQuestions > 0) ? (_correctCount / totalQuestions) * 100 : 0.0;
 
+    // Create the report card instance (use your dashboard/unit fields)
+    final reportCard = ReportCard(
+      correctAnswers: _correctCount,
+      wrongAnswers: _wrongCount,
+      timeElapsed: totalTime,
+      percentage: percentage,
+      // These fields depend on your ReportCard constructor names;
+      // use the correct param names you implemented (dashboardName/unitName or examName).
+      dashboardName: widget.dashboardName,
+      unitName: widget.title,
+    );
+
+    // Persist the report (your persistence helper)
+    await ReportCardPersistence.saveReportCard(reportCard);
+
+    // Show final report dialog
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ReportCard(
-        correctAnswers: _correctCount,
-        wrongAnswers: _wrongCount,
-        timeElapsed: totalTime,
-        percentage: percentage,
-      ),
+      builder: (_) => reportCard,
     );
 
-    final progress = (_currentIndex + 1) / widget.questions.length;
-    Navigator.pop(context, progress);
+    if (!mounted) return;
+
+    final progress = (_currentIndex + 1) / totalQuestions;
+
+    // Small safe delay + microtask to avoid Navigator locking asserts
+    await Future.delayed(const Duration(milliseconds: 120));
+    Future.microtask(() {
+      if (!mounted) return;
+      Navigator.pop(context, {
+        "progress": progress,
+        "selectedAnswers": context.read<ExamCubit>().selectedAnswers,
+      });
+    });
   }
 
   @override

@@ -12,7 +12,7 @@ import 'blocs/exam_cubit.dart';
 import 'package:arabic_font/arabic_font.dart';
 import 'widgets/widgets.dart';
 import 'constants/constants.dart';
-
+import 'services/report_storage.dart';
 
 // =====================
 // Main Dashboard
@@ -635,6 +635,7 @@ class _UnitsTabState extends State<UnitsTab> {
           startIndex: 0,
           endIndex: selected.length,
           isTimed: true,
+          dashboardName: "Tractors",
         ),
       ),
     );
@@ -667,6 +668,7 @@ class _UnitsTabState extends State<UnitsTab> {
           questions: questions,
           startIndex: start,
           endIndex: end,
+          dashboardName: "Tractors",
         ),
       ),
     );
@@ -708,6 +710,7 @@ class UnitQuestionsScreen extends StatefulWidget {
   static List<dynamic> _mistakeCache = [];
   static List<dynamic> get mistakeCache => _mistakeCache;
   final mistakes = UnitQuestionsScreen.mistakeCache;
+  final String dashboardName;
 
   static Future<void> loadMistakes() async {
     final prefs = await SharedPreferences.getInstance();
@@ -745,6 +748,7 @@ class UnitQuestionsScreen extends StatefulWidget {
     required this.startIndex,
     required this.endIndex,
     this.isTimed = false,
+    required this.dashboardName,
   });
 
   @override
@@ -910,23 +914,29 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       final totalQuestions = widget.questions.length;
       final percentage = (_correctCount / totalQuestions) * 100;
 
-      // Show final report dialog
+      final reportCard = ReportCard(
+        correctAnswers: _correctCount,
+        wrongAnswers: _wrongCount,
+        timeElapsed: totalTime,
+        percentage: percentage,
+        dashboardName: widget.dashboardName, // Use the new field
+        unitName: widget.title,              // Use the existing title
+      );
+      // 2. SAVE the ReportCard instance
+      await ReportCardPersistence.saveReportCard(reportCard);
+
+      // 3. Show final report dialog (using the created instance)
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => ReportCard(
-          correctAnswers: _correctCount,
-          wrongAnswers: _wrongCount,
-          timeElapsed: totalTime,
-          percentage: percentage,
-        ),
+        builder: (_) => reportCard, // Pass the created instance
       );
 
       if (!mounted) return;
 
       final progress = (_currentIndex + 1) / totalQuestions;
       await Future.delayed(const Duration(milliseconds: 300));
-      // ✅ Delay pop safely to avoid navigator lock
+      //  Delay pop safely to avoid navigator lock
       Future.microtask(() {
         if (mounted) {
           Navigator.pop(context, {

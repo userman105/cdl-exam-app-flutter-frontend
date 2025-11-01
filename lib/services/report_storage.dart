@@ -1,59 +1,51 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/exam_report.dart';
+import '../report_card.dart'; // Assuming the updated ReportCard is in this file
 
-class ReportStorage {
-  static const _key = "saved_reports";
+class ReportCardPersistence {
+  static const String _key = 'exam_report_cards';
 
-  static Future<void> saveReport(ExamReport report) async {
+  // Saves a single ReportCard instance to SharedPreferences
+  static Future<void> saveReportCard(ReportCard reportCard) async {
     final prefs = await SharedPreferences.getInstance();
-    final reports = await loadReports();
 
-    reports.add(report);
-    final encoded = jsonEncode(reports.map((r) => r.toJson()).toList());
-    await prefs.setString(_key, encoded);
+    // 1. Get the existing list of reports (as JSON strings)
+    final List<String> reportsJson = prefs.getStringList(_key) ?? [];
+
+    // 2. Convert the new ReportCard to a JSON string
+    final newReportJson = jsonEncode(reportCard.toJson());
+
+    // 3. Add the new report to the list
+    reportsJson.add(newReportJson);
+
+    // 4. Save the updated list back to SharedPreferences
+    await prefs.setStringList(_key, reportsJson);
   }
 
-  static Future<List<ExamReport>> loadReports() async {
+  // Loads all saved ReportCard instances
+  // Loads all saved ReportCard instances
+  static Future<List<Map<String, dynamic>>> loadAllReportCards() async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_key);
-    if (jsonString == null) return [];
-    final decoded = jsonDecode(jsonString) as List;
-    return decoded.map((e) => ExamReport.fromJson(e)).toList();
+    final List<String> reportsJson = prefs.getStringList(_key) ?? [];
+
+    return reportsJson.map((jsonString) {
+      try {
+        final decoded = jsonDecode(jsonString);
+
+        // FIX: Explicitly cast the map keys to String
+        return Map<String, dynamic>.from(decoded);
+
+      } catch (e) {
+        print('Error decoding report card JSON: $e');
+        return <String, dynamic>{};
+      }
+    }).toList();
   }
 
-  static Future<void> clearAll() async {
+
+  // Utility to clear all saved reports (for testing/cleanup)
+  static Future<void> clearAllReports() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
   }
-
-
 }
-Future<void> saveReport({
-  required String examName,
-  required String dashboardName,
-  required int correctAnswers,
-  required int wrongAnswers,
-  required double percentage,
-  required Duration duration,
-}) async {
-  final prefs = await SharedPreferences.getInstance();
-  final reports = prefs.getStringList('saved_reports') ?? [];
-
-  final report = jsonEncode({
-    "examName": examName,
-    "dashboardName": dashboardName,
-    "correct": correctAnswers,
-    "wrong": wrongAnswers,
-    "percentage": percentage,
-    "time": duration.inSeconds,
-    "timestamp": DateTime.now().toIso8601String(),
-  });
-
-  reports.add(report);
-  await prefs.setStringList('saved_reports', reports);
-
-  debugPrint("✅ Saved report for $examName (${percentage.toStringAsFixed(1)}%)");
-}
-

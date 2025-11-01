@@ -12,6 +12,7 @@ import '../widgets/widgets.dart';
 import '../constants/constants.dart';
 import '../blocs/exam_cubit.dart';
 import 'package:arabic_font/arabic_font.dart';
+import 'services/report_storage.dart';
 // =====================
 // General Knowledge Dashboard
 // =====================
@@ -618,7 +619,7 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
           selected[i]["correctAnswerId"] = 406 + (qIndex - 136);
         }
 
-        await Navigator.push<double>(
+        final result = await Navigator.push<Map<String, dynamic>>(
           context,
           MaterialPageRoute(
             builder: (_) => GeneralKnowledgeUnitQuestionsScreen(
@@ -627,9 +628,21 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
               startIndex: 0,
               endIndex: selected.length,
               isTimed: true,
+              dashboardName: 'General',
             ),
           ),
         );
+
+// Optional: handle result after exam ends
+        if (result != null) {
+          final progress = result["progress"] as double? ?? 0.0;
+          final selectedAnswers = result["selectedAnswers"] as Map<int, int?>?;
+
+          // You can use these values to update progress tracking or analytics
+          debugPrint("Progress: $progress");
+          debugPrint("Selected answers: $selectedAnswers");
+        }
+
       },
     );
   }
@@ -661,7 +674,7 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
       int start,
       int end,
       ) async {
-    final result = await Navigator.push<double>(
+    final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
         builder: (_) => GeneralKnowledgeUnitQuestionsScreen(
@@ -669,21 +682,32 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
           questions: questions,
           startIndex: start,
           endIndex: end,
+          dashboardName: 'General',
         ),
       ),
     );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     if (result != null) {
-      _updateProgressGeneral(title, result);
+      final progress = result["progress"] as double? ?? 0.0;
+      final selectedAnswers = result["selectedAnswers"] as Map<int, int?>?;
+
+      // Update progress using the extracted progress value
+      _updateProgressGeneral(title, progress);
+
+      // (Optional) You can use selectedAnswers for analytics, report logs, etc.
+      debugPrint("Unit finished with progress: $progress");
+      debugPrint("Selected answers: $selectedAnswers");
     }
 
-    // Refresh previous mistakes on return
+    // Refresh previous mistakes after returning
     setState(() {
-      _mistakesExamFuture = context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+      _mistakesExamFuture =
+          context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
     });
   }
+
 }
 // =====================
 // General Knowledge Unit Question Screen
@@ -696,6 +720,7 @@ class GeneralKnowledgeUnitQuestionsScreen extends StatefulWidget {
   final int startIndex;
   final int endIndex;
   final bool isTimed;
+  final String dashboardName;
 
   static List<dynamic> _mistakeCache = [];
   static List<dynamic> get mistakeCache => _mistakeCache;
@@ -706,6 +731,7 @@ class GeneralKnowledgeUnitQuestionsScreen extends StatefulWidget {
     required this.questions,
     required this.startIndex,
     required this.endIndex,
+    required this.dashboardName,
     this.isTimed = false,
   }) : super(key: key);
 
@@ -870,40 +896,73 @@ class _GeneralKnowledgeUnitQuestionsScreenState
   }
 
   Future<void> _nextQuestion() async {
+    // Reset per-question transient UI state
     _showAnswer = false;
     _selectedAnswerId = null;
     _isArabicExpanded = false;
     _remainingSeconds = 10;
 
+    // If there are remaining questions -> advance
     if (_currentIndex < widget.questions.length - 1) {
-      _currentIndex++;
-      if (widget.isTimed) _startTimer(widget.questions[_currentIndex]);
-    } else {
-      await _showResults();
+      setState(() {
+        _currentIndex++;
+        _selectedAnswerId = null;
+        _showAnswer = false;
+      });
+
+      // restart timer for the new question if timed mode
+      if (widget.isTimed) {
+        _startTimer(widget.questions[_currentIndex]);
+      }
+
       return;
     }
 
-    setState(() {});
-  }
+    // Otherwise we've reached the end -> finish exam
+    _questionTimer?.cancel();
 
-  Future<void> _showResults() async {
     final totalTime = DateTime.now().difference(_startTime);
-    final percentage = (_correctCount / widget.questions.length) * 100;
+    final totalQuestions = widget.questions.length;
+    final percentage = (totalQuestions > 0) ? (_correctCount / totalQuestions) * 100 : 0.0;
 
+    // Create the report card instance (use your dashboard/unit fields)
+    final reportCard = ReportCard(
+      correctAnswers: _correctCount,
+      wrongAnswers: _wrongCount,
+      timeElapsed: totalTime,
+      percentage: percentage,
+      // These fields depend on your ReportCard constructor names;
+      // use the correct param names you implemented (dashboardName/unitName or examName).
+      dashboardName: widget.dashboardName,
+      unitName: widget.title,
+    );
+
+    // Persist the report (your persistence helper)
+    await ReportCardPersistence.saveReportCard(reportCard);
+
+    // Show final report dialog
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ReportCard(
-        correctAnswers: _correctCount,
-        wrongAnswers: _wrongCount,
-        timeElapsed: totalTime,
-        percentage: percentage,
-      ),
+      builder: (_) => reportCard,
     );
 
-    final progress = (_currentIndex + 1) / widget.questions.length;
-    Navigator.pop(context, progress);
+    if (!mounted) return;
+    final progress = (_currentIndex + 1) / totalQuestions;
+
+// Ensure safe pop after dialog is fully dismissed
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).maybePop({
+          "progress": progress,
+          "selectedAnswers": context.read<ExamCubit>().selectedAnswers,
+        });
+      }
+    });
+
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -914,10 +973,16 @@ class _GeneralKnowledgeUnitQuestionsScreenState
       onWillPop: () async {
         final progress = (_currentIndex + 1) / widget.questions.length;
 
-        // return progress when quitting mid-exam
-        Navigator.pop(context, progress);
+        // ✅ Pop immediately with the progress data
+        Navigator.of(context).pop({
+          "progress": progress,
+          "selectedAnswers": context.read<ExamCubit>().state is ExamLoaded
+              ? (context.read<ExamCubit>().state as ExamLoaded).selectedAnswers
+              : <int, int?>{},
+        });
 
-        return false; // prevent default pop
+        // Return false to prevent default back behavior since we already popped
+        return false;
       },
       child: Scaffold(
         appBar: AppBar(title: Text(widget.title)),

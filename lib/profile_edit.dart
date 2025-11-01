@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'blocs/auth_cubit.dart';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'saved_reports.dart';
 
 class ProfileEdit extends StatelessWidget {
   const ProfileEdit({super.key});
@@ -61,31 +62,31 @@ class ProfileEdit extends StatelessWidget {
                 );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: const Text("Update Password"),
-              onTap: () {
-                Navigator.pop(context);
-                // step 1: ask for old password
-                _showTextInputDialog(
-                  context,
-                  "Enter old password",
-                      (oldPass) async {
-                    // step 2: ask for new password
-                    _showTextInputDialog(
-                      context,
-                      "Enter new password",
-                          (newPass) async {
-                        await context.read<AuthCubit>().updateProfile(
-                          oldPassword: oldPass,
-                          newPassword: newPass,
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+            // ListTile(
+            //   leading: const Icon(Icons.lock),
+            //   title: const Text("Update Password"),
+            //   onTap: () {
+            //     Navigator.pop(context);
+            //     // step 1: ask for old password
+            //     _showTextInputDialog(
+            //       context,
+            //       "Enter old password",
+            //           (oldPass) async {
+            //         // step 2: ask for new password
+            //         _showTextInputDialog(
+            //           context,
+            //           "Enter new password",
+            //               (newPass) async {
+            //             await context.read<AuthCubit>().updateProfile(
+            //               oldPassword: oldPass,
+            //               newPassword: newPass,
+            //             );
+            //           },
+            //         );
+            //       },
+            //     );
+            //   },
+            // ),
 
           ],
         );
@@ -169,7 +170,7 @@ class ProfileEdit extends StatelessWidget {
                     label: "Profile",
                     iconPath: "assets/icons/profile.svg",
                     onTap: () {
-                      // Navigate to edit profile details
+                     Navigator.push(context, MaterialPageRoute(builder: (_)=>ReportHistoryScreen()));
                     },
                   ),
                   const SizedBox(height: 24),
@@ -180,7 +181,7 @@ class ProfileEdit extends StatelessWidget {
                         if (authState is AuthAuthenticated) {
                           _openSettingsDrawer(context);
                         } else if (authState is AuthGuest) {
-                          _showErrorSnack(context, "error");
+                          _showErrorSnack(context, "this option is not available in guest mode");
                         } else {
                           // If it's AuthError or AuthLoading but we *were* authenticated,
                           // don’t block user. Just open drawer.

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
+import 'dart:convert';
+
+// ===================================
+// ReportCard Model & Widget - FIX APPLIED
+// ===================================
 
 class ReportCard extends StatefulWidget {
   final int correctAnswers;
@@ -8,13 +13,48 @@ class ReportCard extends StatefulWidget {
   final Duration timeElapsed;
   final double percentage;
 
+  // NEW FIELDS
+  final String dashboardName;
+  final String unitName;
+
   const ReportCard({
     super.key,
     required this.correctAnswers,
     required this.wrongAnswers,
     required this.timeElapsed,
     required this.percentage,
+    required this.dashboardName, // NEW
+    required this.unitName,      // NEW
   });
+
+  // ===================================
+  // Serialization Methods for Persistence
+  // ===================================
+
+  Map<String, dynamic> toJson() {
+    return {
+      'correctAnswers': correctAnswers,
+      'wrongAnswers': wrongAnswers,
+      'timeElapsedSeconds': timeElapsed.inSeconds, // Store as seconds
+      'percentage': percentage,
+      'dashboardName': dashboardName,
+      'unitName': unitName,
+      'timestamp': DateTime.now().toIso8601String(), // For sorting/tracking
+    };
+  }
+
+  factory ReportCard.fromJson(Map<String, dynamic> json) {
+    return ReportCard(
+      correctAnswers: json['correctAnswers'] as int,
+      wrongAnswers: json['wrongAnswers'] as int,
+      timeElapsed: Duration(seconds: json['timeElapsedSeconds'] as int),
+      percentage: json['percentage'] as double,
+      dashboardName: json['dashboardName'] as String,
+      unitName: json['unitName'] as String,
+      // Note: The widget constructor doesn't need the timestamp,
+      // but it's useful for the persistence manager.
+    );
+  }
 
   @override
   State<ReportCard> createState() => _ReportCardState();
@@ -111,6 +151,12 @@ class _ReportCardState extends State<ReportCard>
                       ),
                     ),
                     const SizedBox(height: 24),
+                    // NEW: Display Dashboard and Unit Name
+                    _buildRow("Dashboard", widget.dashboardName),
+                    const SizedBox(height: 8),
+                    _buildRow("Unit", widget.unitName),
+                    const SizedBox(height: 16),
+                    // End NEW
                     _buildRow("Correct Answers", widget.correctAnswers.toString()),
                     const SizedBox(height: 8),
                     _buildRow("Wrong Answers", widget.wrongAnswers.toString()),
