@@ -12,6 +12,7 @@ import '../widgets/widgets.dart';
 import '../constants/constants.dart';
 import '../blocs/exam_cubit.dart';
 import 'package:arabic_font/arabic_font.dart';
+import 'blocs/auth_cubit.dart';
 import 'services/report_storage.dart';
 // =====================
 // General Knowledge Dashboard
@@ -165,15 +166,32 @@ class _GeneralKnowledgeQuestionsTabState extends State<GeneralKnowledgeQuestions
           final questions = state.examData["questions"] as List<dynamic>;
           return Column(
             children: [
+              // --- inside build() ---
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
-                  onPageChanged: (i) => setState(() {
-                    _currentPage = i;
-                    _showAnswer = false;
-                  }),
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (i) {
+                    final authState = context.read<AuthCubit>().state;
+                    final bool isLimitedUser = authState is AuthGuest ||
+                        (authState is AuthAuthenticated &&
+                            (authState.subscribed == null || authState.subscribed == false));
+
+                    // Prevent going past 20 if limited
+                    if (isLimitedUser && i >= 20) {
+                      _showUpgradeSnackbar();
+                      _pageController.jumpToPage(19);
+                      return;
+                    }
+
+                    setState(() {
+                      _currentPage = i;
+                      _showAnswer = false;
+                    });
+                  },
                   itemCount: questions.length,
-                  itemBuilder: (context, index) => _buildQuestionPage(questions, index, state),
+                  itemBuilder: (context, index) =>
+                      _buildQuestionPage(questions, index, state),
                 ),
               ),
               _buildNavigationBar(questions.length),
@@ -374,13 +392,27 @@ class _GeneralKnowledgeQuestionsTabState extends State<GeneralKnowledgeQuestions
   }
 
   Future<void> _handleShowAnswer(List<dynamic> questions, int index) async {
+    final authState = context.read<AuthCubit>().state;
+    final bool isLimitedUser = authState is AuthGuest ||
+        (authState is AuthAuthenticated &&
+            (authState.subscribed == null || authState.subscribed == false));
+
+    // 🚫 Block show answer beyond 20
+    if (isLimitedUser && index >= 20) {
+      _showUpgradeSnackbar();
+      return;
+    }
+
     setState(() => _showAnswer = true);
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('progress_general_questionsbank', _currentPage);
+    await prefs.setInt('progress_questionsbank', _currentPage);
 
     await Future.delayed(const Duration(seconds: 1));
+
     if (mounted) {
       setState(() => _showAnswer = false);
+
       if (index < questions.length - 1) {
         _pageController.nextPage(
           duration: const Duration(milliseconds: 300),
@@ -394,41 +426,65 @@ class _GeneralKnowledgeQuestionsTabState extends State<GeneralKnowledgeQuestions
     }
   }
 
-  Widget _buildNavigationBar(int total) => Padding(
-    padding: const EdgeInsets.all(12.0),
-    child: Row(
-      children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _currentPage > 0
-              ? () => _pageController.previousPage(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          )
-              : null,
-        ),
-        Expanded(
-          child: Slider(
-            value: _currentPage.toDouble(),
-            min: 0,
-            max: (total - 1).toDouble(),
-            divisions: total - 1,
-            label: "Q${_currentPage + 1}",
-            onChanged: (v) => _pageController.jumpToPage(v.toInt()),
+
+
+  Widget _buildNavigationBar(int totalQuestions) {
+    final authState = context.read<AuthCubit>().state;
+
+    // check if user is guest or not subscribed
+    final bool isLimitedUser = authState is AuthGuest ||
+        (authState is AuthAuthenticated &&
+            (authState.subscribed == null || authState.subscribed == false));
+
+    // if limited, cap the questions to 20
+    final int allowedQuestions = isLimitedUser ? 20 : totalQuestions;
+    final int maxPage = allowedQuestions - 1;
+
+    return Padding(
+      padding: const EdgeInsets.all(12.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _currentPage > 0
+                ? () => _pageController.previousPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            )
+                : null,
           ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.arrow_forward),
-          onPressed: _currentPage < total - 1
-              ? () => _pageController.nextPage(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          )
-              : null,
-        ),
-      ],
-    ),
-  );
+          Expanded(
+            child: Slider(
+              value: _currentPage.clamp(0, maxPage).toDouble(),
+              min: 0,
+              max: maxPage.toDouble(),
+              divisions: maxPage,
+              label: "Q${_currentPage + 1}",
+              onChanged: (val) {
+                if (isLimitedUser && val.toInt() >= 20) {
+                  _showUpgradeSnackbar();
+                } else {
+                  _pageController.jumpToPage(val.toInt());
+                }
+              },
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward),
+            onPressed: (_currentPage < maxPage)
+                ? () => _pageController.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            )
+                : () {
+              if (isLimitedUser) _showUpgradeSnackbar();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
 
   void _speakEnglish(Map<String, dynamic> question, List<dynamic> answers) {
     TTSService.showSnackBar(context, 'TTS', 'Commencing speech...', ContentType.help);
@@ -442,6 +498,24 @@ class _GeneralKnowledgeQuestionsTabState extends State<GeneralKnowledgeQuestions
     final text =
         "${question['questionTextAr']}. ${answers.map((a) => a['answerTextAr']).join('، ')}";
     TTSService.speak(text, context, langCode: "ar-SA");
+  }
+
+  void _showUpgradeSnackbar() {
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: AwesomeSnackbarContent(
+        title: 'اشترك الآن واستمتع بكل المزايا!',
+        message: 'قم بالترقية للوصول إلى جميع الأسئلة والمحاولات غير المحدودة!',
+        contentType: ContentType.warning,
+      ),
+      duration: const Duration(seconds: 4),
+    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(snackBar);
   }
 }
 

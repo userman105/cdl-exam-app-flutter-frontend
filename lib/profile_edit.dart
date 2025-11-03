@@ -9,6 +9,7 @@ import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'saved_reports.dart';
 import 'blocs/auth_cubit.dart';
 import 'blocs/exam_cubit.dart';
+import 'subscription_screen.dart';
 
 class ProfileEdit extends StatelessWidget {
   const ProfileEdit({super.key});
@@ -218,6 +219,56 @@ class ProfileEdit extends StatelessWidget {
 
               const Spacer(),
 
+// ✅ Current Plan section
+              if (authState is AuthAuthenticated) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Current Plan: ",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      authState.subscribed == true ? "Premium" : "Basic",
+                      style: GoogleFonts.robotoSlab(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: authState.subscribed == true
+                            ? const Color(0xFF3298CB)
+                            : Colors.grey[700],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    if (authState.subscribed == false)
+                      GestureDetector(
+                        onTap: () {
+                          // ✅ Navigate to your Google IAP screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SubscriptionScreen(), // <- replace with your screen
+                            ),
+                          );
+                        },
+                        child: Text(
+                          "Upgrade",
+                          style: GoogleFonts.robotoSlab(
+                            fontSize: 16,
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -240,6 +291,7 @@ class ProfileEdit extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+
             ],
           ),
         ),

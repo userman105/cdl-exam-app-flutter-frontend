@@ -21,6 +21,7 @@ class AuthAuthenticated extends AuthState {
   final String? profilePath; // local image (from gallery)
   final String? photoUrl; // remote image (from backend or Google)
   final bool? isExistingUser;
+  final bool? subscribed; //
 
   AuthAuthenticated({
     required this.username,
@@ -28,6 +29,7 @@ class AuthAuthenticated extends AuthState {
     this.profilePath,
     this.photoUrl,
     this.isExistingUser,
+    this.subscribed = false,
   });
 
   AuthAuthenticated copyWith({
@@ -36,6 +38,7 @@ class AuthAuthenticated extends AuthState {
     String? profilePath,
     String? photoUrl,
     bool? isExistingUser,
+    bool? subscribed,
   }) {
     return AuthAuthenticated(
       username: username ?? this.username,
@@ -43,9 +46,11 @@ class AuthAuthenticated extends AuthState {
       profilePath: profilePath ?? this.profilePath,
       photoUrl: photoUrl ?? this.photoUrl,
       isExistingUser: isExistingUser ?? this.isExistingUser,
+      subscribed: subscribed ?? this.subscribed, // ✅ keep when copying
     );
   }
 }
+
 
 
 class AuthError extends AuthState {

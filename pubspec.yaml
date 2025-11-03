@@ -49,6 +49,7 @@ dependencies:
   flutter_tts: ^4.2.3
   connectivity_plus: ^7.0.0
   arabic_font: ^0.0.9
+  in_app_purchase: ^3.2.3
 
 dev_dependencies:
   flutter_test:
@@ -91,6 +92,12 @@ flutter:
     - assets/icons/the_star.png
     - assets/icons/subscription.png
     - assets/icons/unit_button_icon.png
+    - assets/icons/monthly_white.png
+    - assets/icons/monthly_highlighted.png
+    - assets/icons/weekly_white.png
+    - assets/icons/weekly_highlighted.png
+    - assets/icons/yearly_white.png
+    - assets/icons/yearly_highlighted.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'blocs/auth_cubit.dart';
 import 'report_card.dart';
 import 'blocs/exam_cubit.dart';
 import 'package:arabic_font/arabic_font.dart';
@@ -147,7 +148,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     return  questionId;
   }
 
-  
+
   @override
   void dispose() {
     TTSService.stop();
@@ -172,19 +173,35 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
 
           return Column(
             children: [
+              // --- inside build() ---
               Expanded(
                 child: PageView.builder(
                   controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
                   onPageChanged: (i) {
+                    final authState = context.read<AuthCubit>().state;
+                    final bool isLimitedUser = authState is AuthGuest ||
+                        (authState is AuthAuthenticated &&
+                            (authState.subscribed == null || authState.subscribed == false));
+
+                    // Prevent going past 20 if limited
+                    if (isLimitedUser && i >= 20) {
+                      _showUpgradeSnackbar();
+                      _pageController.jumpToPage(19);
+                      return;
+                    }
+
                     setState(() {
                       _currentPage = i;
                       _showAnswer = false;
                     });
                   },
                   itemCount: questions.length,
-                  itemBuilder: (context, index) => _buildQuestionPage(questions, index, state),
+                  itemBuilder: (context, index) =>
+                      _buildQuestionPage(questions, index, state),
                 ),
               ),
+
               _buildNavigationBar(questions.length),
             ],
           );
@@ -357,6 +374,17 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
   }
 
   Future<void> _handleShowAnswer(List<dynamic> questions, int index) async {
+    final authState = context.read<AuthCubit>().state;
+    final bool isLimitedUser = authState is AuthGuest ||
+        (authState is AuthAuthenticated &&
+            (authState.subscribed == null || authState.subscribed == false));
+
+    //  Block show answer beyond 20
+    if (isLimitedUser && index >= 20) {
+      _showUpgradeSnackbar();
+      return;
+    }
+
     setState(() => _showAnswer = true);
 
     final prefs = await SharedPreferences.getInstance();
@@ -380,7 +408,20 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     }
   }
 
+
+
   Widget _buildNavigationBar(int totalQuestions) {
+    final authState = context.read<AuthCubit>().state;
+
+    // check if user is guest or not subscribed
+    final bool isLimitedUser = authState is AuthGuest ||
+        (authState is AuthAuthenticated &&
+            (authState.subscribed == null || authState.subscribed == false));
+
+    // if limited, cap the questions to 20
+    final int allowedQuestions = isLimitedUser ? 20 : totalQuestions;
+    final int maxPage = allowedQuestions - 1;
+
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
@@ -396,27 +437,37 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
           ),
           Expanded(
             child: Slider(
-              value: _currentPage.toDouble(),
+              value: _currentPage.clamp(0, maxPage).toDouble(),
               min: 0,
-              max: (totalQuestions - 1).toDouble(),
-              divisions: totalQuestions - 1,
+              max: maxPage.toDouble(),
+              divisions: maxPage,
               label: "Q${_currentPage + 1}",
-              onChanged: (val) => _pageController.jumpToPage(val.toInt()),
+              onChanged: (val) {
+                if (isLimitedUser && val.toInt() >= 20) {
+                  _showUpgradeSnackbar();
+                } else {
+                  _pageController.jumpToPage(val.toInt());
+                }
+              },
             ),
           ),
           IconButton(
             icon: const Icon(Icons.arrow_forward),
-            onPressed: _currentPage < totalQuestions - 1
+            onPressed: (_currentPage < maxPage)
                 ? () => _pageController.nextPage(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             )
-                : null,
+                : () {
+              if (isLimitedUser) _showUpgradeSnackbar();
+            },
           ),
         ],
       ),
     );
   }
+
+
 
   void _speakEnglish(Map<String, dynamic> question, List<dynamic> answers) {
     TTSService.showSnackBar(
@@ -445,6 +496,24 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
 
     TTSService.speak(text, context, langCode: "ar-SA");
   }
+  void _showUpgradeSnackbar() {
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: AwesomeSnackbarContent(
+        title: 'اشترك الآن واستمتع بكل المزايا!',
+        message: 'قم بالترقية للوصول إلى جميع الأسئلة والمحاولات غير المحدودة!',
+        contentType: ContentType.warning,
+      ),
+      duration: const Duration(seconds: 4),
+    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(snackBar);
+  }
+
 }
 
 // =====================
@@ -1225,3 +1294,5 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     );
   }
 }
+
+
