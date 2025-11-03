@@ -22,6 +22,8 @@ class AuthAuthenticated extends AuthState {
   final String? photoUrl; // remote image (from backend or Google)
   final bool? isExistingUser;
   final bool? subscribed; //
+  final String? typeOfSubscription;
+  final bool isSubscriptionActive;
 
   AuthAuthenticated({
     required this.username,
@@ -30,6 +32,9 @@ class AuthAuthenticated extends AuthState {
     this.photoUrl,
     this.isExistingUser,
     this.subscribed = false,
+    this.typeOfSubscription,
+    this.isSubscriptionActive = false,
+
   });
 
   AuthAuthenticated copyWith({
@@ -567,13 +572,20 @@ class AuthCubit extends Cubit<AuthState> {
 
         final username = user["userName"] ?? "User";
         final photoUrl = user["photoUrl"] ?? user["googlePhotoUrl"];
-        final subscribed = user["subscribed"] == true; // ✅ Extract boolean safely
+        final subscribed = user["subscribed"] ?? false;
+        final typeOfSubscription = user["typeOfSubscription"];
+        final isSubscriptionActive = user["isSubscriptionActive"] ?? false;
+
+        print("✅ Loaded user photo URL: $photoUrl");
+        print("✅ Subscribed: $subscribed");
 
         final updatedState = AuthAuthenticated(
           username: username,
           token: token,
           photoUrl: photoUrl,
-          subscribed: subscribed, // ✅ Store subscription status
+          subscribed: subscribed,
+          typeOfSubscription: typeOfSubscription,
+          isSubscriptionActive: isSubscriptionActive,
         );
 
         _lastAuthenticated = updatedState;

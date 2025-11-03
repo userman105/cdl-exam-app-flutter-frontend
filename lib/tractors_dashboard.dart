@@ -17,6 +17,7 @@ import 'services/report_storage.dart';
 import 'package:cdl_flutter/subscription_screen.dart';
 import 'register_screen.dart';
 import 'services/trial_manager.dart';
+import 'package:shimmer/shimmer.dart';
 // =====================
 // Main Dashboard
 // =====================
@@ -60,55 +61,76 @@ class _TractorsDashboardState extends State<TractorsDashboard>
           "الجرار و المقطورات",
           style: ArabicTextStyle(arabicFont: ArabicFont.dubai  ,fontWeight: FontWeight.w500, fontSize: 23),
         ),
-        actions: [
-          IconButton(
-            icon: Image.asset(
-              "assets/icons/subscription.png",
-              width: 132,
-              height: 132,
-            ),
-            onPressed: () {
-              final authState = context.read<AuthCubit>().state;
 
-              // Case 1: Guest user → show dialog urging to register
-              if (authState is AuthGuest) {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text("تسجيل الحساب"),
-                      content: const Text("يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context), // cancel
-                          child: const Text("إلغاء"),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context); // close dialog
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text("تسجيل"),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              }
-              // Case 2: Authenticated user → go to subscription screen
-              else if (authState is AuthAuthenticated) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SubscriptionScreen(),
+        actions: [
+          Builder(
+            builder: (context) {
+              final authState = context.watch<AuthCubit>().state;
+
+              final bool isSubscribed = authState is AuthAuthenticated && authState.subscribed == true;
+
+              return IconButton(
+                icon: isSubscribed
+                    ? Shimmer.fromColors(
+                  baseColor: Colors.amberAccent,
+                  highlightColor: Colors.white,
+                  period: const Duration(seconds: 3),
+                  child: Text(
+                    "PRO",
+                    style: GoogleFonts.orbitron(
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                        color: Colors.amber,
+                      ),
+                    ),
                   ),
-                );
-              }
+                )
+                    : Image.asset(
+                  "assets/icons/subscription.png",
+                  width: 132,
+                  height: 132,
+                ),
+                onPressed: () {
+                  // Handle guest case
+                  if (authState is AuthGuest) {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text("تسجيل الحساب"),
+                          content: const Text("يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text("إلغاء"),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                                );
+                              },
+                              child: const Text("تسجيل"),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  }
+
+                  // Handle subscribed users → go to SubscriptionScreen
+                  else if (authState is AuthAuthenticated) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+                    );
+                  }
+                },
+              );
             },
           ),
         ],

@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="cdl_flutter"
+        android:label="CDL A to Z"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

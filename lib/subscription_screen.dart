@@ -26,16 +26,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           boxShadow: [
             if (isSelected)
               BoxShadow(
-                color: Colors.blue.withOpacity(0.4),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 3,
+                offset: const Offset(0, 10),
               ),
           ],
           borderRadius: BorderRadius.circular(16),
         ),
         child: Image.asset(
           isSelected ? highlightedIcon : whiteIcon,
-          height: 80,
+          height: 90,
         ),
       ),
     );
