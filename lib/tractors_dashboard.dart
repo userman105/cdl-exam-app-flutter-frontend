@@ -14,7 +14,9 @@ import 'package:arabic_font/arabic_font.dart';
 import 'widgets/widgets.dart';
 import 'constants/constants.dart';
 import 'services/report_storage.dart';
-
+import 'package:cdl_flutter/subscription_screen.dart';
+import 'register_screen.dart';
+import 'services/trial_manager.dart';
 // =====================
 // Main Dashboard
 // =====================
@@ -60,9 +62,53 @@ class _TractorsDashboardState extends State<TractorsDashboard>
         ),
         actions: [
           IconButton(
-            icon: Image.asset("assets/icons/subscription.png", width: 132, height: 132),
+            icon: Image.asset(
+              "assets/icons/subscription.png",
+              width: 132,
+              height: 132,
+            ),
             onPressed: () {
-              // TODO: Implement subscription
+              final authState = context.read<AuthCubit>().state;
+
+              // Case 1: Guest user → show dialog urging to register
+              if (authState is AuthGuest) {
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: const Text("تسجيل الحساب"),
+                      content: const Text("يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context), // cancel
+                          child: const Text("إلغاء"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context); // close dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text("تسجيل"),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+              // Case 2: Authenticated user → go to subscription screen
+              else if (authState is AuthAuthenticated) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SubscriptionScreen(),
+                  ),
+                );
+              }
             },
           ),
         ],
@@ -529,6 +575,8 @@ class UnitsTab extends StatefulWidget {
 class _UnitsTabState extends State<UnitsTab> {
   final Map<String, double> _unitProgress = {};
   late Future<Map<String, dynamic>?> _mistakesExamFuture;
+  int _remainingTrials = 0;
+  bool _isSubscribed = false;
 
 
   @override
@@ -536,7 +584,20 @@ class _UnitsTabState extends State<UnitsTab> {
     super.initState();
     _loadProgress();
     _mistakesExamFuture = context.read<ExamCubit>().getPreviousMistakesExamData("tractors");
+    _initTrials();
   }
+
+
+
+  Future<void> _initTrials() async {
+    final attempts = await TrialManager.getRemaining();
+    final authState = context.read<AuthCubit>().state;
+    setState(() {
+      _remainingTrials = attempts;
+      _isSubscribed = authState is AuthAuthenticated && authState.subscribed == true;
+    });
+  }
+
 
   @override
   void didChangeDependencies() {
@@ -544,7 +605,6 @@ class _UnitsTabState extends State<UnitsTab> {
     _mistakesExamFuture = context.read<ExamCubit>().getPreviousMistakesExamData("tractors");
 
   }
-
 
 
   // 🔹 Save progress persistently
@@ -591,6 +651,15 @@ class _UnitsTabState extends State<UnitsTab> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+
+                if (!_isSubscribed) ...[
+                  Text(
+                    "المحاولات المتبقية اليوم: $_remainingTrials / 10",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
                 FutureBuilder<Map<String, dynamic>?>(
                   future: _mistakesExamFuture,
                   builder: (context, snapshot) {
@@ -654,35 +723,40 @@ class _UnitsTabState extends State<UnitsTab> {
   }
 
   Widget _buildPreviousMistakesUnit(BuildContext context, Map<String, dynamic> exam) {
-    // REMOVE: final exam = _previousMistakesExam!;
     final questions = (exam["questions"] ?? []) as List<dynamic>;
-
     if (questions.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Previous Mistakes",
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        UnitButton(
-          title: exam["title"] ?? "Previous Mistakes",
-          questionCount: questions.length,
-          progress: _unitProgress[exam["title"]] ?? 0.0,
-          accentColor: kErrorColor,
-          icon: Icons.error_outline,
-          onTap: () {
-            // NEW: Load the mistakes exam into the Cubit state when button is tapped
-            context.read<ExamCubit>().loadMistakesExamIntoState(exam);
+    final locked = !_isSubscribed;
 
-            // Then navigate to the UnitQuestionsScreen using the newly loaded state
-            _navigateToUnit(context, exam["title"], questions, 0, questions.length);
-          },
-        ),
-        const SizedBox(height: 20),
-      ],
+    return UnitButton(
+      title: exam["title"] ?? "Previous Mistakes",
+      questionCount: questions.length,
+      progress: _unitProgress[exam["title"]] ?? 0.0,
+      accentColor: locked ? Colors.grey : kErrorColor,
+      icon: Icons.error_outline,
+      onTap: locked
+          ? () => _showUpgradeDialog(context)
+          : () {
+        context.read<ExamCubit>().loadMistakesExamIntoState(exam);
+        _navigateToUnit(context, exam["title"], questions, 0, questions.length);
+      },
+    );
+  }
+
+
+  void _showUpgradeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("محتوى مقفل"),
+        content: const Text("قم بالترقية للوصول إلى الأخطاء السابقة."),
+        actions: [
+          TextButton(
+            child: const Text("إلغاء"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
     );
   }
 
@@ -729,6 +803,15 @@ class _UnitsTabState extends State<UnitsTab> {
       int start,
       int end,
       ) async {
+    if (!_isSubscribed) {
+      final remaining = await TrialManager.useOne();
+      setState(() => _remainingTrials = remaining);
+      if (remaining <= 0) {
+        _showUpgradeDialog(context);
+        return;
+      }
+    }
+
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
@@ -1026,15 +1109,30 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
 
     return WillPopScope(
       onWillPop: () async {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("تحذير"),
+            content: const Text("هل أنت متأكد أنك تريد مغادرة الامتحان؟ لن يتم حفظ التقدم."),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("لا")),
+              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("نعم")),
+            ],
+          ),
+        );
+
+        if (confirm != true) return false;
+
         final progress = (_currentIndex + 1) / widget.questions.length;
-        Navigator.pop(context, {
+        Navigator.of(context).pop({
           "progress": progress,
-          "selectedAnswers": context.read<ExamCubit>().selectedAnswers,
+          "selectedAnswers": context.read<ExamCubit>().state is ExamLoaded
+              ? (context.read<ExamCubit>().state as ExamLoaded).selectedAnswers
+              : <int, int?>{},
         });
-
-
         return false;
       },
+
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.title,

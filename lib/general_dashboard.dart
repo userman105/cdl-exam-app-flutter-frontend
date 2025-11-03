@@ -14,6 +14,10 @@ import '../blocs/exam_cubit.dart';
 import 'package:arabic_font/arabic_font.dart';
 import 'blocs/auth_cubit.dart';
 import 'services/report_storage.dart';
+import 'register_screen.dart';
+import 'subscription_screen.dart';
+import 'services/trial_manager.dart';
+
 // =====================
 // General Knowledge Dashboard
 // =====================
@@ -60,9 +64,53 @@ class _GeneralKnowledgeDashboardState extends State<GeneralKnowledgeDashboard>
         ),
         actions: [
           IconButton(
-            icon: Image.asset("assets/icons/subscription.png", width: 132, height: 132),
+            icon: Image.asset(
+              "assets/icons/subscription.png",
+              width: 132,
+              height: 132,
+            ),
             onPressed: () {
-              // TODO: Implement subscription
+              final authState = context.read<AuthCubit>().state;
+
+              // Case 1: Guest user → show dialog urging to register
+              if (authState is AuthGuest) {
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: const Text("تسجيل الحساب"),
+                      content: const Text("يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context), // cancel
+                          child: const Text("إلغاء"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context); // close dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text("تسجيل"),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+              // Case 2: Authenticated user → go to subscription screen
+              else if (authState is AuthAuthenticated) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SubscriptionScreen(),
+                  ),
+                );
+              }
             },
           ),
         ],
@@ -531,6 +579,9 @@ class GeneralKnowledgeUnitsTab extends StatefulWidget {
 }
 
 class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
+
+  int _remainingTrials = 0;
+  bool _isSubscribed = false; // Will come from your auth state
   final Map<String, double> _unitProgressGeneral = {};
   late Future<Map<String, dynamic>?> _mistakesExamFuture;
   final String _examKey = "general_knowledge";
@@ -548,7 +599,20 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
     super.didChangeDependencies();
     _mistakesExamFuture =
         context.read<ExamCubit>().getPreviousMistakesExamData(_examKey);
+
+    _initTrials();
   }
+
+
+  Future<void> _initTrials() async {
+    final attempts = await TrialManager.getRemaining();
+    final authState = context.read<AuthCubit>().state;
+    setState(() {
+      _remainingTrials = attempts;
+      _isSubscribed = authState is AuthAuthenticated && authState.subscribed == true;
+    });
+  }
+
 
   // 🔹 Load saved General progress
   Future<void> _loadProgressGeneral() async {
@@ -590,10 +654,21 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
         final total = questions.length;
 
         return Padding(
+
+
           padding: const EdgeInsets.all(20.0),
           child: SingleChildScrollView(
             child: Column(
               children: [
+
+                if (!_isSubscribed) ...[
+                  Text(
+                    "المحاولات المتبقية اليوم: $_remainingTrials / 10",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
                 //  Show previous mistakes (if any)
                 FutureBuilder<Map<String, dynamic>?>(
                   future: _mistakesExamFuture,
@@ -722,23 +797,44 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
   }
 
   // 🔹 Previous Mistakes Unit
-  Widget _buildPreviousMistakesUnit(
-      BuildContext context, Map<String, dynamic> exam) {
+  Widget _buildPreviousMistakesUnit(BuildContext context, Map<String, dynamic> exam) {
     final questions = (exam["questions"] ?? []) as List<dynamic>;
     if (questions.isEmpty) return const SizedBox.shrink();
+
+    final locked = !_isSubscribed;
 
     return UnitButton(
       title: exam["title"] ?? "Previous Mistakes",
       questionCount: questions.length,
       progress: _unitProgressGeneral[exam["title"]] ?? 0.0,
-      accentColor: kErrorColor,
+      accentColor: locked ? Colors.grey : kErrorColor,
       icon: Icons.error_outline,
-      onTap: () {
+      onTap: locked
+          ? () => _showUpgradeDialog(context)
+          : () {
         context.read<ExamCubit>().loadMistakesExamIntoState(exam);
         _navigateToUnit(context, exam["title"], questions, 0, questions.length);
       },
     );
   }
+
+
+  void _showUpgradeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("محتوى مقفل"),
+        content: const Text("قم بالترقية للوصول إلى الأخطاء السابقة."),
+        actions: [
+          TextButton(
+            child: const Text("إلغاء"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   // 🔹 Unified Navigation Handler
   Future<void> _navigateToUnit(
@@ -748,6 +844,16 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
       int start,
       int end,
       ) async {
+
+    if (!_isSubscribed) {
+      final remaining = await TrialManager.useOne();
+      setState(() => _remainingTrials = remaining);
+      if (remaining <= 0) {
+        _showUpgradeDialog(context);
+        return;
+      }
+    }
+
     final result = await Navigator.push<Map<String, dynamic>>(
       context,
       MaterialPageRoute(
@@ -1045,19 +1151,30 @@ class _GeneralKnowledgeUnitQuestionsScreenState
 
     return WillPopScope(
       onWillPop: () async {
-        final progress = (_currentIndex + 1) / widget.questions.length;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("تحذير"),
+            content: const Text("هل أنت متأكد أنك تريد مغادرة الامتحان؟ لن يتم حفظ التقدم."),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("لا")),
+              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("نعم")),
+            ],
+          ),
+        );
 
-        // ✅ Pop immediately with the progress data
+        if (confirm != true) return false;
+
+        final progress = (_currentIndex + 1) / widget.questions.length;
         Navigator.of(context).pop({
           "progress": progress,
           "selectedAnswers": context.read<ExamCubit>().state is ExamLoaded
               ? (context.read<ExamCubit>().state as ExamLoaded).selectedAnswers
               : <int, int?>{},
         });
-
-        // Return false to prevent default back behavior since we already popped
         return false;
       },
+
       child: Scaffold(
         appBar: AppBar(title: Text(widget.title)),
         body: SingleChildScrollView(

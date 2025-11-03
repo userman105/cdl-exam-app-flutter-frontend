@@ -567,13 +567,13 @@ class AuthCubit extends Cubit<AuthState> {
 
         final username = user["userName"] ?? "User";
         final photoUrl = user["photoUrl"] ?? user["googlePhotoUrl"];
-
-        print("✅ Loaded user photo URL: $photoUrl");
+        final subscribed = user["subscribed"] == true; // ✅ Extract boolean safely
 
         final updatedState = AuthAuthenticated(
           username: username,
           token: token,
           photoUrl: photoUrl,
+          subscribed: subscribed, // ✅ Store subscription status
         );
 
         _lastAuthenticated = updatedState;
@@ -600,6 +600,7 @@ class AuthCubit extends Cubit<AuthState> {
       return {"success": false, "error": e.toString()};
     }
   }
+
 
 
 
