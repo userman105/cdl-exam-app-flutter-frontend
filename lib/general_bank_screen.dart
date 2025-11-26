@@ -14,7 +14,10 @@ import '../blocs/exam_cubit.dart';
 import 'blocs/auth_cubit.dart';
 
 class GeneralKnowledgeQuestionsTab extends StatefulWidget {
-  const GeneralKnowledgeQuestionsTab({Key? key}) : super(key: key);
+  final bool resumeFromLast;
+
+  const GeneralKnowledgeQuestionsTab({Key? key, this.resumeFromLast = false})
+      : super(key: key);
 
   @override
   State<GeneralKnowledgeQuestionsTab> createState() =>
@@ -37,6 +40,17 @@ class _GeneralKnowledgeQuestionsTabState
   @override
   void initState() {
     super.initState();
+
+    if (widget.resumeFromLast) {
+      // Restore progress with dialog
+      _restoreProgress();
+    } else {
+      // Wait for first frame, then jump to 0
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _pageController.jumpToPage(0);
+        setState(() => _currentPage = 0);
+      });
+    }
   }
 
   @override
@@ -81,7 +95,7 @@ class _GeneralKnowledgeQuestionsTabState
                   child: PageView.builder(
                     controller: _pageController,
                     physics: const BouncingScrollPhysics(),
-                    onPageChanged: (i) {
+                    onPageChanged: (i) async{
                       final authState = context.read<AuthCubit>().state;
                       final bool isLimitedUser = authState is AuthGuest ||
                           (authState is AuthAuthenticated &&
@@ -93,6 +107,10 @@ class _GeneralKnowledgeQuestionsTabState
                         _pageController.jumpToPage(6);
                         return;
                       }
+
+
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setInt('progress_questionsbank', i);
 
                       setState(() {
                         _currentPage = i;
@@ -532,5 +550,51 @@ class _GeneralKnowledgeQuestionsTabState
       ..hideCurrentSnackBar()
       ..showSnackBar(snackBar);
   }
+
+  Future<void> _restoreProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedPage = prefs.getInt('progress_questionsbank') ?? 0;
+
+    if (savedPage == 0) return; // No previous progress → nothing to ask
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      bool? resume = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("استكمال التقدم؟"),
+            content: const Text("هل تريد الرجوع لنفس السؤال الذي توقفت عنده؟"),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context, false); // Restart from question 1
+                },
+                child: const Text("ابدأ من جديد"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context, true); // Resume
+                },
+                child: const Text("استكمال"),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (resume == true) {
+        // Jump to saved page
+        _pageController.jumpToPage(savedPage);
+        setState(() => _currentPage = savedPage);
+      } else {
+        // Reset to page 0
+        _pageController.jumpToPage(0);
+        await prefs.setInt('progress_questionsbank', 0);
+        setState(() => _currentPage = 0);
+      }
+    });
+  }
+
 
 }

@@ -219,7 +219,7 @@ class ExamCubit extends Cubit<ExamState> {
         jsonEncode(updatedExam),
       );
 
-      debugPrint("🧹 Cleaned '$examKey' mistakes exam — now ${updatedQuestions.length} remain.");
+      debugPrint(" Cleaned '$examKey' mistakes exam — now ${updatedQuestions.length} remain.");
     }
   }
   Map<int, int?> get selectedAnswers {
@@ -242,7 +242,7 @@ class ExamCubit extends Cubit<ExamState> {
       }
     }
 
-    debugPrint("🧹 Cleared ${removed.length} saved exam entries.");
+    debugPrint(" Cleared ${removed.length} saved exam entries.");
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
