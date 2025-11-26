@@ -108,6 +108,7 @@ flutter:
     - assets/icons/weekly_highlighted.png
     - assets/icons/yearly_white.png
     - assets/icons/yearly_highlighted.png
+    - assets/json/
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

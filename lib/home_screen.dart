@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -91,37 +93,98 @@ class HomeScreen extends StatelessWidget {
   }) async {
     final examCubit = context.read<ExamCubit>();
 
+    // Show spinner
     unawaited(_showSpinner(context));
 
+    bool backendSucceeded = false;
+
     try {
+      // Try loading from backend
       unawaited(examCubit.loadExam(context, examId));
 
       final state = await examCubit.stream
           .firstWhere((s) => s is ExamLoaded || s is ExamError)
           .timeout(
         const Duration(seconds: 15),
-        onTimeout: () => ExamError("Exam loading timed out. Please try again."),
+        onTimeout: () => ExamError("Request timed out."),
       );
 
       if (context.mounted) Navigator.of(context).pop();
 
       if (state is ExamLoaded) {
+        backendSucceeded = true;
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => destinationBuilder()),
         );
+        return;
       } else if (state is ExamError) {
+        // Friendly snack bar
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                "Couldn't reach the server. Loading offline version...",
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (context.mounted) Navigator.of(context).pop();
+      // Friendly snack bar on any other network error
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.message)),
+          SnackBar(
+            content: const Text(
+              "No internet connection. Loading offline version...",
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
-    } catch (e) {
-      if (context.mounted) Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load exam: $e")),
-      );
+    }
+
+    // Fallback to local JSON if backend failed
+    if (!backendSucceeded) {
+      try {
+        final String jsonString =
+        await rootBundle.loadString('assets/json/exam$examId.json');
+        final Map<String, dynamic> examData = jsonDecode(jsonString);
+
+        await examCubit.loadFromLocalJson(examData);
+
+        if (context.mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => destinationBuilder()),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                "Failed to load offline exam. Please try again later.",
+                style: TextStyle(color: Colors.white),
+              ),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     }
   }
+
+
 
 
   @override
@@ -166,7 +229,6 @@ class HomeScreen extends StatelessWidget {
             ),
 
             // Profile button
-            // Profile button (✅ fixed to use authState.photoUrl directly)
             Positioned(
               top: 40,
               right: 20,
@@ -213,20 +275,20 @@ class HomeScreen extends StatelessWidget {
 
             // Buttons
             Align(
-              alignment: const FractionalOffset(0.5, 0.85),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildButton(
-                    label: "معلومات عامة",
-                    iconPath: "assets/icons/general.svg",
-                    onTap: () => _loadExamAndNavigate(
-                      context: context,
-                      examId: 3,
-                      destinationBuilder: () =>
-                          GeneralKnowledgeDashboard(initialTabIndex: 1),
-                    ),
-                  ),
+                    alignment: const FractionalOffset(0.5, 0.85),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildButton(
+                          label: "معلومات عامة",
+                          iconPath: "assets/icons/general.svg",
+                          onTap: () => _loadExamAndNavigate(
+                            context: context,
+                            examId: 3,
+                            destinationBuilder: () =>
+                                GeneralKnowledgeDashboard(initialTabIndex: 0),
+                          ),
+                        ),
                   const SizedBox(height: 40),
                   _buildButton(
                     label: "الفرامل الهوائية",
@@ -235,7 +297,7 @@ class HomeScreen extends StatelessWidget {
                       context: context,
                       examId: 2,
                       destinationBuilder: () =>
-                          AirbrakesDashboard(initialTabIndex: 1),
+                          AirbrakesDashboard(initialTabIndex: 0),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -246,7 +308,7 @@ class HomeScreen extends StatelessWidget {
                       context: context,
                       examId: 1,
                       destinationBuilder: () =>
-                          TractorsDashboard(initialTabIndex: 1),
+                          TractorsDashboard(initialTabIndex: 0),
                     ),
                   ),
                   const SizedBox(height: 200),

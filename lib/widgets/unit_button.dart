@@ -39,16 +39,23 @@ class UnitButton extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ------------------ TOP ROW ------------------
                 Row(
+                  textDirection: TextDirection.rtl, // 🔥 RTL: icon & text on right
                   children: [
+                    // Icon (right side)
                     if (icon != null)
                       Icon(icon, color: color, size: 28)
                     else if (iconAsset != null)
                       Image.asset(iconAsset!, width: 28, height: 28),
+
                     const SizedBox(width: 12),
+
+                    // Title
                     Expanded(
                       child: Text(
                         title,
+                        textAlign: TextAlign.right, //  Ensure Arabic right alignment
                         style: ArabicTextStyle(
                           arabicFont: ArabicFont.dubai,
                           fontSize: 16,
@@ -57,11 +64,17 @@ class UnitButton extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: Colors.black54),
+
+                    // Chevron arrow (forces to left)
+                    const Icon(Icons.chevron_left, color: Colors.black54),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
+                // ------------------ BOTTOM ROW ------------------
                 Row(
+                  textDirection: TextDirection.rtl, //  Keep RTL order
                   children: [
                     Text(
                       "$questionCount سؤال ",

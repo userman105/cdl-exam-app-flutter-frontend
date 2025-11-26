@@ -254,5 +254,9 @@ class ExamCubit extends Cubit<ExamState> {
     }
   }
 
+  Future<void> loadFromLocalJson(Map<String, dynamic> examData) async {
+    emit(ExamLoaded(examData: examData, selectedAnswers: {}));
+  }
+
 
 }

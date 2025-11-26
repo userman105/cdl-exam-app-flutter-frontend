@@ -19,6 +19,7 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+  final bool isPitchMode = const bool.fromEnvironment('IS_PITCH', defaultValue: false);
 
   @override
   void initState() {
@@ -98,7 +99,6 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -112,111 +112,119 @@ class _SplashScreenState extends State<SplashScreen>
               fit: BoxFit.cover,
             ),
           ),
+
+          // TOP LOGO
           Align(
-            alignment: const Alignment(0, -0.90),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/Splash.png',
-                  width: 500,
-                  height: 500,
-                ),
-                const SizedBox(height: 130),
+            alignment: const Alignment(0, -0.65),
+            child: Image.asset(
+              'assets/images/Splash.png',
+              width: 350,
+              height: 350,
+            ),
+          ),
 
-                // Guest Button (no internet check)
-                OutlinedButton(
-                  onPressed: () {
-                    context.read<AuthCubit>().continueAsGuest();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white, width: 3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 35, vertical: 15),
-                  ),
-                  child: Text(
-                    "زائر",
-                    style: ArabicTextStyle(
-                      arabicFont: ArabicFont.dubai,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
+          // BUTTONS FIXED AT THE BOTTOM
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
 
-                const SizedBox(height: 16),
-
-                // Login button with internet check
-                OutlinedButton(
-                  onPressed: () =>
-                      _checkConnectionAndNavigate(const LoginPage()),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white, width: 2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 35, vertical: 15),
-                  ),
-                  child: Text(
-                    "تسجيل الدخول",
-                    style: ArabicTextStyle(
-                      arabicFont: ArabicFont.dubai,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Register Button with internet check
-                InkWell(
-                  onTap: () =>
-                      _checkConnectionAndNavigate(const RegisterScreen()),
-                  child: Container(
-                    width: 370,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(5),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SvgPicture.asset(
-                          "assets/icons/exclamation_icon.svg",
-                          height: 20,
+                  // GUEST BUTTON
+                  SizedBox(
+                    width: 250,
+                    height: 55,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        context.read<AuthCubit>().continueAsGuest();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomeScreen()),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white, width: 3),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          "قم بالتسجيل للاستمتاع بعروض التطبيق",
-                          style: ArabicTextStyle(
-                            arabicFont: ArabicFont.dubai,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
+                      ),
+                      child: Text(
+                        "زائر",
+                        style: ArabicTextStyle(
+                          arabicFont: ArabicFont.dubai,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // LOGIN BUTTON
+                  SizedBox(
+                    width: 250,
+                    height: 55,
+                    child: OutlinedButton(
+                      onPressed: isPitchMode ? null : () => _checkConnectionAndNavigate(const LoginPage()),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white, width: 2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        "تسجيل الدخول",
+                        style: ArabicTextStyle(
+                          arabicFont: ArabicFont.dubai,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // REGISTER BAR
+                  InkWell(
+                    onTap: isPitchMode ? null : () => _checkConnectionAndNavigate(const RegisterScreen()),
+                    child: Container(
+                      width: 360,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(isPitchMode ? 0.1 : 0.3),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset("assets/icons/exclamation_icon.svg", height: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            "قم بالتسجيل للاستمتاع بعروض التطبيق",
+                            style: ArabicTextStyle(
+                              arabicFont: ArabicFont.dubai,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withOpacity(isPitchMode ? 0.4 : 1.0),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
 }
