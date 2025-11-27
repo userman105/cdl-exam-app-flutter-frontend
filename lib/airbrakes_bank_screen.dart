@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
@@ -15,8 +16,9 @@ import 'blocs/auth_cubit.dart';
 
 class AirbrakesQuestionsTab extends StatefulWidget {
   final bool resumeFromLast;
+  final int? questionLimit;
 
-  const AirbrakesQuestionsTab({Key? key, this.resumeFromLast = false})
+  const AirbrakesQuestionsTab({Key? key, this.resumeFromLast = false, this.questionLimit})
       : super(key: key);
 
   @override
@@ -75,36 +77,64 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
             return Column(
               children: [
                 Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    physics: const BouncingScrollPhysics(),
-                    onPageChanged: (i) async {
-                      final authState = context.read<AuthCubit>().state;
-                      final bool isLimitedUser = authState is AuthGuest ||
-                          (authState is AuthAuthenticated &&
-                              (authState.subscribed == null ||
-                                  authState.subscribed == false));
+                  child: Expanded(
+                    child: FutureBuilder<SharedPreferences>(
+                      future: SharedPreferences.getInstance(),
+                      builder: (context, snap) {
+                        if (!snap.hasData) return SizedBox();
 
-                      final int allowedQuestions =
-                      isLimitedUser ? 20 : totalQuestions;
-                      if (isLimitedUser && i >= allowedQuestions) {
-                        _showUpgradeSnackbar();
-                        _pageController.jumpToPage(allowedQuestions - 1);
-                        return;
-                      }
+                        final prefs = snap.data!;
+                        final savedProgress = prefs.getInt('airbrakes_progress_questionsbank') ?? 0;
+                        final progressLimit = savedProgress + 1;
 
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setInt('airbrakes_progress_questionsbank', i);
+                        final authState = context.read<AuthCubit>().state;
+                        final bool isLimitedUser = authState is AuthGuest ||
+                            (authState is AuthAuthenticated &&
+                                (authState.subscribed == null ||
+                                    authState.subscribed == false));
 
-                      setState(() {
-                        _currentPage = i;
-                        _showAnswer = false;
-                      });
-                    },
-                    itemCount: questions.length,
-                    itemBuilder: (context, index) =>
-                        _buildQuestionPage(questions, index, state),
+                        final int subscriptionLimit = isLimitedUser ? 20 : totalQuestions;
+
+                        // FINAL max accessible question count
+                        final int accessibleQuestions = () {
+                          // When opened from Button C → enforce saved progress limit
+                          if (widget.questionLimit != null) {
+                            return min(
+                              subscriptionLimit,
+                              min(widget.questionLimit!, totalQuestions),
+                            );
+                          }
+
+                          // When opened from Button A → ignore progress limit
+                          return min(subscriptionLimit, totalQuestions);
+                        }();
+
+
+                        return PageView.builder(
+                          controller: _pageController,
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: accessibleQuestions,
+                          onPageChanged: (i) async {
+                            if (i >= accessibleQuestions) {
+                              _showUpgradeSnackbar();
+                              _pageController.jumpToPage(accessibleQuestions - 1);
+                              return;
+                            }
+
+                            await prefs.setInt('airbrakes_progress_questionsbank', i);
+
+                            setState(() {
+                              _currentPage = i;
+                              _showAnswer = false;
+                            });
+                          },
+                          itemBuilder: (context, index) =>
+                              _buildQuestionPage(questions, index, state),
+                        );
+                      },
+                    ),
                   ),
+
                 ),
                 _buildNavigationBar(totalQuestions),
               ],
@@ -258,66 +288,86 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
     }
   }
 
-  Widget _buildNavigationBar(int totalQuestions) {
+  Widget _buildNavigationBar(int realTotalQuestions) {
     final authState = context.read<AuthCubit>().state;
     final bool isLimitedUser = authState is AuthGuest ||
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
 
-    final int accessibleQuestions = isLimitedUser ? 20 : totalQuestions;
-    final int maxPage = (accessibleQuestions > 0) ? accessibleQuestions - 1 : 0;
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snap) {
+        if (!snap.hasData) return SizedBox();
 
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _currentPage > 0
-                ? () => _pageController.previousPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            )
-                : null,
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showJumpDialog(
-                accessibleQuestions: accessibleQuestions,
-                realTotalQuestions: totalQuestions,
+        final prefs = snap.data!;
+        final savedProgress =
+            prefs.getInt('airbrakes_progress_questionsbank') ?? 0;
+
+        final int progressLimit = savedProgress + 1;
+        final int subscriptionLimit = isLimitedUser ? 20 : realTotalQuestions;
+
+        final int accessibleQuestions = min(
+            subscriptionLimit, min(progressLimit, realTotalQuestions));
+
+        final int maxPage =
+        accessibleQuestions > 0 ? accessibleQuestions - 1 : 0;
+
+        return Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _currentPage > 0
+                    ? () => _pageController.previousPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                )
+                    : null,
               ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade400),
-                ),
-                child: Center(
-                  child: Text(
-                    "${_currentPage + 1} / $totalQuestions",
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
+
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showJumpDialog(
+                    accessibleQuestions: accessibleQuestions,
+                    realTotalQuestions: realTotalQuestions,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "${_currentPage + 1} / $realTotalQuestions",
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+
+              IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: (_currentPage < maxPage)
+                    ? () => _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                )
+                    : () {
+                  if (isLimitedUser) _showUpgradeSnackbar();
+                },
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward),
-            onPressed: (_currentPage < maxPage)
-                ? () => _pageController.nextPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            )
-                : () {
-              if (isLimitedUser) _showUpgradeSnackbar();
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
+
 
   void _showJumpDialog({
     required int accessibleQuestions,

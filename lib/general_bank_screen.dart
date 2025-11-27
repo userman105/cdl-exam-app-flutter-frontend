@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:flutter/material.dart';
@@ -15,8 +16,10 @@ import 'blocs/auth_cubit.dart';
 
 class GeneralKnowledgeQuestionsTab extends StatefulWidget {
   final bool resumeFromLast;
+  final int? questionLimit;
 
-  const GeneralKnowledgeQuestionsTab({Key? key, this.resumeFromLast = false})
+
+  const GeneralKnowledgeQuestionsTab({Key? key, this.resumeFromLast = false, this.questionLimit})
       : super(key: key);
 
   @override
@@ -95,7 +98,22 @@ class _GeneralKnowledgeQuestionsTabState
                   child: PageView.builder(
                     controller: _pageController,
                     physics: const BouncingScrollPhysics(),
-                    onPageChanged: (i) async{
+                    onPageChanged: (i) async {
+
+                      // ------------------------------------------------------
+                      // 🔒 Restrict forward navigation if opened from Button C
+                      // ------------------------------------------------------
+                      if (widget.questionLimit != null) {
+                        if (i >= widget.questionLimit!) {
+                          // User tried going past the limit → stop them
+                          _pageController.jumpToPage(widget.questionLimit! - 1);
+                          return;
+                        }
+                      }
+
+                      // ------------------------------------------------------
+                      // 🔒 Free version restriction (your existing logic)
+                      // ------------------------------------------------------
                       final authState = context.read<AuthCubit>().state;
                       final bool isLimitedUser = authState is AuthGuest ||
                           (authState is AuthAuthenticated &&
@@ -108,19 +126,26 @@ class _GeneralKnowledgeQuestionsTabState
                         return;
                       }
 
-
+                      // ------------------------------------------------------
+                      // Save progress (NORMAL behavior)
+                      // ------------------------------------------------------
                       final prefs = await SharedPreferences.getInstance();
                       await prefs.setInt('progress_questionsbank', i);
 
+                      // ------------------------------------------------------
+                      // Update UI
+                      // ------------------------------------------------------
                       setState(() {
                         _currentPage = i;
                         _showAnswer = false;
                       });
                     },
+
                     itemCount: questions.length,
                     itemBuilder: (context, index) =>
                         _buildQuestionPage(questions, index, state),
                   ),
+
                 ),
                 _buildNavigationBar(realTotalQuestions),
               ],
@@ -347,35 +372,43 @@ class _GeneralKnowledgeQuestionsTabState
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
 
-    // Block show answer beyond 7 for limited users
-    if (isLimitedUser && index >= 7) {
+    // SAME BEHAVIOR AS QuestionsBankTab:
+    // Limited users can ONLY access first 7 questions
+    final int allowedQuestions = isLimitedUser ? 7 : questions.length;
+
+    if (isLimitedUser && index >= allowedQuestions) {
       _showUpgradeSnackbar();
       return;
     }
 
+    // Show the answer temporarily
     setState(() => _showAnswer = true);
 
+    // Save progress
     final prefs = await SharedPreferences.getInstance();
-    // Save current page position into a local key (keeps same name you used)
     await prefs.setInt('progress_questionsbank', _currentPage);
 
+    // Match the 1-second answer reveal like previous class
     await Future.delayed(const Duration(seconds: 1));
 
-    if (mounted) {
-      setState(() => _showAnswer = false);
+    if (!mounted) return;
 
-      if (index < questions.length - 1) {
-        _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("You have reached the last question")),
-        );
-      }
+    setState(() => _showAnswer = false);
+
+    // Auto-next (exactly like previous class)
+    if (index < allowedQuestions - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Last accessible question reached
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You have reached the last question")),
+      );
     }
   }
+
 
   // ----------------------
   // Navigation bar (uses realTotalQuestions for display and validation)
@@ -386,64 +419,85 @@ class _GeneralKnowledgeQuestionsTabState
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
 
-    // accessibleQuestions caps only the accessible count — but we still show the real total
-    final int accessibleQuestions = isLimitedUser ? 7 : realTotalQuestions;
-    final int maxPage = (accessibleQuestions > 0) ? accessibleQuestions - 1 : 0;
+    // ----- NEW: PROGRESS-BASED LIMIT -----
+    final prefs = SharedPreferences.getInstance();
 
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _currentPage > 0
-                ? () => _pageController.previousPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            )
-                : null,
-          ),
+    return FutureBuilder<SharedPreferences>(
+      future: prefs,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return SizedBox();
 
-          // Center widget shows current / realTotalQuestions
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _showJumpDialog(
-                accessibleQuestions: accessibleQuestions,
-                realTotalQuestions: realTotalQuestions,
+        final savedProgress = snapshot.data!.getInt('progress_questionsbank') ?? 0;
+
+        // The user can access everything they already reached in button A
+        final int progressLimit = savedProgress + 1;
+
+        // ---- Final accessible count ----
+        // Apply subscription limit AND progress limit together
+        final int accessibleQuestions = isLimitedUser
+            ? min(7, progressLimit)
+            : progressLimit;
+
+        final int maxPage = (accessibleQuestions > 0)
+            ? accessibleQuestions - 1
+            : 0;
+
+        return Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _currentPage > 0
+                    ? () => _pageController.previousPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                )
+                    : null,
               ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade400),
-                ),
-                child: Center(
-                  child: Text(
-                    "${_currentPage + 1} / $realTotalQuestions",
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600),
+
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showJumpDialog(
+                    accessibleQuestions: accessibleQuestions,
+                    realTotalQuestions: realTotalQuestions,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade400),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "${_currentPage + 1} / $realTotalQuestions",
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          IconButton(
-            icon: const Icon(Icons.arrow_forward),
-            onPressed: (_currentPage < maxPage)
-                ? () => _pageController.nextPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            )
-                : () {
-              if (isLimitedUser) _showUpgradeSnackbar();
-            },
+              IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: (_currentPage < maxPage)
+                    ? () => _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                )
+                    : () {
+                  if (isLimitedUser) _showUpgradeSnackbar();
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
+
 
   // ----------------------
   // Jump dialog (validates both accessible and real total)

@@ -2,20 +2,21 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'blocs/exam_cubit.dart';
 import '../widgets/unit_button.dart';
-import 'general_bank_screen.dart';
-import 'general_study_tab.dart';
-class GeneralKnowledgeExtraTab extends StatefulWidget {
-  const GeneralKnowledgeExtraTab({Key? key}) : super(key: key);
+import 'blocs/exam_cubit.dart';
+import 'tractors_study_tab.dart';
+import 'tractors_bank_screen.dart';
+import 'tractors_study_tab.dart';
+
+class TractorsExtraTab extends StatefulWidget {
+  const TractorsExtraTab({Key? key}) : super(key: key);
 
   @override
-  State<GeneralKnowledgeExtraTab> createState() =>
-      _GeneralKnowledgeExtraTabState();
+  State<TractorsExtraTab> createState() => _TractorsExtraTabState();
 }
 
-class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
-  final Map<String, double> _progressExtraUnits = {};
+class _TractorsExtraTabState extends State<TractorsExtraTab> {
+  final Map<String, double> _progressExtraUnitsTractors = {};
 
   @override
   void initState() {
@@ -25,22 +26,21 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
 
   Future<void> _loadProgressExtra() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString("extra_units_progress");
+    final saved = prefs.getString("tractors_extra_units_progress");
     if (saved != null) {
       setState(() {
-        _progressExtraUnits
+        _progressExtraUnitsTractors
             .addAll(Map<String, double>.from(jsonDecode(saved)));
       });
     }
   }
 
-
   /// Show resume/start dialog
   Future<bool?> _showResumeDialog(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
-    final savedPage = prefs.getInt('progress_questionsbank') ?? 0;
+    final savedPage = prefs.getInt('tractors_progress_questionsbank') ?? 0;
 
-    if (savedPage == 0) return false; // No dialog needed
+    if (savedPage == 0) return false;
 
     return showDialog<bool>(
       barrierDismissible: false,
@@ -64,10 +64,9 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
     );
   }
 
-  /// Get dynamic progress percentage based on last saved question
   Future<double> _getProgressPercentage() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedPage = prefs.getInt('progress_questionsbank') ?? 0;
+    final savedPage = prefs.getInt('tractors_progress_questionsbank') ?? 0;
 
     final examState = context.read<ExamCubit>().state;
     if (examState is ExamLoaded) {
@@ -78,14 +77,11 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
     return 0.0;
   }
 
-
-
   Future<double> _getProgressPercentageStudy() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedPage = prefs.getInt('progress_questionsbank_study') ?? 0;
+    final savedPage = prefs.getInt('tractors_progress_questionsbank_study') ?? 0;
 
     final examState = context.read<ExamCubit>().state;
-
     if (examState is ExamLoaded) {
       final total = examState.examData["totalQuestions"] ?? 1;
       return savedPage / total;
@@ -96,13 +92,9 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
 
   Future<int?> _getQuestionsProgress() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!prefs.containsKey('progress_questionsbank')) {
-      return null; // user never opened questions tab
-    }
-    return prefs.getInt('progress_questionsbank');
+    if (!prefs.containsKey('tractors_progress_questionsbank')) return null;
+    return prefs.getInt('tractors_progress_questionsbank');
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +129,7 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => GeneralKnowledgeQuestionsTab(
+                      builder: (_) => QuestionsBankTab(
                         resumeFromLast: resume == true,
                       ),
                     ),
@@ -168,7 +160,7 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => GeneralKnowledgeStudyTab(
+                      builder: (_) => QuestionsBankStudyTab(
                         resumeFromLast: resume == true,
                       ),
                     ),
@@ -194,17 +186,15 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
                 progress: progress != null ? (progress + 1) / totalQuestions : 0.0,
                 iconAsset: "assets/icons/unit_button_icon.png",
                 onTap: () async {
-
                   if (progress == null) {
-                    // User never opened the questions tab
                     showDialog(
                       context: context,
                       builder: (_) => AlertDialog(
-                        title: Text("لا يوجد تقدم"),
-                        content: Text("يبدو أنك لم تبدأ حل الأسئلة بعد."),
+                        title: const Text("لا يوجد تقدم"),
+                        content: const Text("يبدو أنك لم تبدأ حل الأسئلة بعد."),
                         actions: [
                           TextButton(
-                            child: Text("حسناً"),
+                            child: const Text("حسناً"),
                             onPressed: () => Navigator.pop(context),
                           )
                         ],
@@ -213,11 +203,10 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
                     return;
                   }
 
-                  // If progress exists → open a review screen or just jump to that page
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => GeneralKnowledgeQuestionsTab(
+                      builder: (_) => QuestionsBankTab(
                         resumeFromLast: true,
                         questionLimit: progress + 1,
                       ),
@@ -227,11 +216,8 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
               );
             },
           ),
-
         ],
       ),
     );
   }
-
-
 }

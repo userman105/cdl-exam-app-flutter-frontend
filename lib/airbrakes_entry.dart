@@ -211,6 +211,7 @@ class _AirBrakesExtraTabState extends State<AirBrakesExtraTab> {
                     MaterialPageRoute(
                       builder: (_) => AirbrakesQuestionsTab(
                         resumeFromLast: true,
+                        questionLimit: progress + 1,
                       ),
                     ),
                   );
