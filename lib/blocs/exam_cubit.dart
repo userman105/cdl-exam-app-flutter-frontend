@@ -202,6 +202,21 @@ class ExamCubit extends Cubit<ExamState> {
       }
     }
 
+    Future<int> loadGeneralKnowledgeCount() async {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString("exam_1"); // or exam_general
+      if (cached == null) return 0;
+
+      try {
+        final data = jsonDecode(cached);
+        final questions = data["questions"] as List?;
+        return questions?.length ?? 0;
+      } catch (_) {
+        return 0;
+      }
+    }
+
+
     // If all are correct → delete mistakes exam entirely
     if (updatedQuestions.isEmpty) {
       await prefs.remove("exam_previous_mistakes_$examKey");
