@@ -20,6 +20,7 @@ import 'services/trial_manager.dart';
 import 'package:shimmer/shimmer.dart';
 import 'tractors_bank_screen.dart';
 import 'tractors_entry.dart';
+import 'package:animate_do/animate_do.dart';
 
 // =====================
 // Main Dashboard
@@ -60,84 +61,84 @@ class _TractorsDashboardState extends State<TractorsDashboard>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "الجرار و المقطورات",
-          style: ArabicTextStyle(arabicFont: ArabicFont.dubai  ,fontWeight: FontWeight.w500, fontSize: 23),
-        ),
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        elevation: 0,
 
-        actions: [
-          Builder(
-            builder: (context) {
-              final authState = context.watch<AuthCubit>().state;
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // ---------------- LEFT: Subscription ----------------
+            IconButton(
+              icon: Image.asset(
+                "assets/icons/subscription.png",
+                width: 115,
+                height: 115,
+              ),
+              onPressed: () {
+                final authState = context.read<AuthCubit>().state;
 
-              final bool isSubscribed = authState is AuthAuthenticated && authState.subscribed == true;
-
-              return IconButton(
-                icon: isSubscribed
-                    ? Shimmer.fromColors(
-                  baseColor: Colors.amberAccent,
-                  highlightColor: Colors.white,
-                  period: const Duration(seconds: 3),
-                  child: Text(
-                    "PRO",
-                    style: GoogleFonts.orbitron(
-                      textStyle: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                        color: Colors.amber,
-                      ),
+                if (authState is AuthGuest) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("تسجيل الحساب"),
+                      content: const Text(
+                          "يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("إلغاء"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text("تسجيل"),
+                        ),
+                      ],
                     ),
-                  ),
-                )
-                    : Image.asset(
-                  "assets/icons/subscription.png",
-                  width: 132,
-                  height: 132,
-                ),
-                onPressed: () {
-                  // Handle guest case
-                  if (authState is AuthGuest) {
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return AlertDialog(
-                          title: const Text("تسجيل الحساب"),
-                          content: const Text("يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("إلغاء"),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                                );
-                              },
-                              child: const Text("تسجيل"),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  }
+                  );
+                } else if (authState is AuthAuthenticated) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SubscriptionScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
 
-                  // Handle subscribed users → go to SubscriptionScreen
-                  else if (authState is AuthAuthenticated) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                    );
-                  }
-                },
-              );
-            },
-          ),
-        ],
+            // ---------------- CENTER: Title ----------------
+            Text(
+              "الجرار والمقطورات",
+              textDirection: TextDirection.rtl,
+              style: ArabicTextStyle(
+                arabicFont: ArabicFont.dubai,
+                fontWeight: FontWeight.w500,
+                fontSize: 23,
+              ),
+            ),
+
+            // ---------------- RIGHT: Back Arrow ----------------
+            IconButton(
+              icon: const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.black,
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       ),
+
       body: Column(
         children: [
           _buildShadowDivider(),
@@ -156,6 +157,7 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     );
   }
 
+
   Widget _buildShadowDivider() {
     return Container(
       height: 1,
@@ -172,30 +174,42 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     );
   }
 
-  Widget _buildTabBar() {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Row(
-        mainAxisAlignment:MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          CustomTabButton(
-            text: "بنك الاسئلة",
-            isActive: _tabController.index == 0,
-            onTap: () => _tabController.animateTo(0),
-            underlineWidth: 86,
-          ),
-          const SizedBox(width: 12),
-          CustomTabButton(
-            text: "الأمتحانات",
-            isActive: _tabController.index == 1,
-            onTap: () => _tabController.animateTo(1),
-            underlineWidth: 50,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildTabBar() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+    child: Column(
+      children: [
+
+
+
+        const SizedBox(height: 10),
+
+        // TABS (RIGHT ALIGNED)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            CustomTabButton(
+              text: "بنك الاسئلة",
+              isActive: _tabController.index == 0,
+              onTap: () => _tabController.animateTo(0),
+            ),
+            const SizedBox(width: 28),
+            CustomTabButton(
+              text: "التمارين",
+              isActive: _tabController.index == 1,
+              onTap: () => _tabController.animateTo(1),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+
+      ],
+    ),
+  );
+
+
 }
 
 // =====================
@@ -875,7 +889,10 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
   }
 
 
-  Widget _buildArabicCard(Map<String, dynamic> question, List<dynamic> answers) {
+  Widget _buildArabicCard(
+      Map<String, dynamic> question,
+      List<dynamic> answers,
+      ) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -890,47 +907,83 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
+
             ...answers.map((ans) {
-              final isSelected = _selectedAnswerId == ans["answerId"];
-              final isCorrect = _showAnswer && ans["answerId"] == question["questionId"];
-              final isWrong = _showAnswer && isSelected && !isCorrect;
+              final bool isSelected = _selectedAnswerId == ans["answerId"];
+              final bool isCorrect =
+                  _showAnswer && ans["answerId"] == question["questionId"];
+              final bool isWrong =
+                  _showAnswer && isSelected && !isCorrect;
+
+              final Color bgColor = isCorrect
+                  ? Colors.green
+                  : isWrong
+                  ? Colors.red
+                  : isSelected
+                  ? Colors.blue.shade100
+                  : Colors.white;
+
+              final Color textColor =
+              (isCorrect || isWrong) ? Colors.white : Colors.black;
+
+              final Widget content = Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: (isCorrect || isWrong)
+                      ? [
+                    BoxShadow(
+                      color: bgColor.withOpacity(0.6),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    )
+                  ]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        ans["answerTextAr"] ?? "",
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: textColor,
+                          fontWeight:
+                          (isCorrect || isWrong) ? FontWeight.bold : null,
+                        ),
+                      ),
+                    ),
+
+                    if (isCorrect)
+                      const Icon(Icons.check_circle,
+                          color: Colors.white, size: 26),
+
+                    if (isWrong)
+                      const Icon(Icons.cancel,
+                          color: Colors.white, size: 26),
+                  ],
+                ),
+              );
 
               return GestureDetector(
                 onTap: !_showAnswer
-                    ? () => setState(() => _selectedAnswerId = ans["answerId"])
+                    ? () => setState(
+                      () => _selectedAnswerId = ans["answerId"],
+                )
                     : null,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isCorrect
-                        ? Colors.green[100]
-                        : isWrong
-                        ? Colors.red[100]
-                        : isSelected
-                        ? Colors.blue[100]
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isCorrect
-                          ? Colors.green
-                          : isWrong
-                          ? Colors.red
-                          : Colors.grey[300]!,
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      ans["answerTextAr"] ?? "",
-                      textDirection: TextDirection.rtl,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ),
+                child: _showAnswer && (isCorrect || isWrong)
+                    ? BounceIn(child: content)
+                    : content,
               );
             }),
+
             const SizedBox(height: 16),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -968,6 +1021,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       ),
     );
   }
+
 
 
   Widget _headerStatusBox() {

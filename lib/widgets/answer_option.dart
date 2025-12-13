@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:animate_do/animate_do.dart';
 import 'package:cdl_flutter/constants/constants.dart';
 
 class AnswerOption extends StatelessWidget {
@@ -21,41 +22,86 @@ class AnswerOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final answerId = answer["answerId"];
-    Color borderColor = Colors.grey.shade300;
-    Color? fillColor;
-    Color textColor = Colors.black;
+    final int answerId = answer["answerId"];
 
-    if (showAnswer) {
-      if (answerId == correctAnswerId) {
-        borderColor = Colors.green;
-        fillColor = Colors.green.withOpacity(0.1);
-        textColor = Colors.green.shade900;
-      } else if (selectedAnswer == answerId && answerId != correctAnswerId) {
-        borderColor = kErrorColor;
-        fillColor = kErrorColor.withOpacity(0.1);
-        textColor = Colors.red.shade900;
-      }
-    } else if (selectedAnswer == answerId) {
-      borderColor = kPrimaryColor;
-      fillColor = kPrimaryColor.withOpacity(0.1);
-    }
+    final bool isSelected = selectedAnswer == answerId;
+    final bool isCorrect =
+        showAnswer && answerId == correctAnswerId;
+    final bool isWrong =
+        showAnswer && isSelected && answerId != correctAnswerId;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: fillColor ?? Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor, width: 2),
-        ),
-        child: Text(
-          answer["answerText"] ?? "",
-          style: TextStyle(fontSize: 16, color: textColor),
-        ),
+    // ---------- COLORS ----------
+    final Color bgColor = isCorrect
+        ? Colors.green
+        : isWrong
+        ? Colors.red
+        : isSelected
+        ? kPrimaryColor.withOpacity(0.15)
+        : Colors.white;
+
+    final Color borderColor = isCorrect
+        ? Colors.green
+        : isWrong
+        ? kErrorColor
+        : isSelected
+        ? kPrimaryColor
+        : Colors.grey.shade300;
+
+    final Color textColor =
+    (isCorrect || isWrong) ? Colors.white : Colors.black;
+
+    // ---------- CONTENT ----------
+    final Widget content = Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor, width: 2),
+        boxShadow: (isCorrect || isWrong)
+            ? [
+          BoxShadow(
+            color: bgColor.withOpacity(0.6),
+            blurRadius: 14,
+            spreadRadius: 1,
+          )
+        ]
+            : [],
       ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Text(
+              answer["answerText"] ?? "",
+              textDirection: TextDirection.rtl,
+              style: TextStyle(
+                fontSize: 16,
+                color: textColor,
+                fontWeight:
+                (isCorrect || isWrong) ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+
+          if (isCorrect)
+            const Icon(Icons.check_circle,
+                color: Colors.white, size: 26),
+
+          if (isWrong)
+            const Icon(Icons.cancel,
+                color: Colors.white, size: 26),
+        ],
+      ),
+    );
+
+    // ---------- ANIMATION ----------
+    return GestureDetector(
+      onTap: !showAnswer ? onTap : null,
+      child: showAnswer && (isCorrect || isWrong)
+          ? BounceIn(child: content)
+          : content,
     );
   }
 }

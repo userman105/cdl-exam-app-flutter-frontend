@@ -51,6 +51,7 @@ dependencies:
   arabic_font: ^0.0.9
   in_app_purchase: ^3.2.3
   shimmer: ^3.0.0
+  animate_do: ^4.2.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
@@ -109,6 +110,7 @@ flutter:
     - assets/icons/yearly_white.png
     - assets/icons/yearly_highlighted.png
     - assets/json/
+    - assets/icons/subscription_eng.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

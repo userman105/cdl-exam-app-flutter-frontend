@@ -119,7 +119,7 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
         children: [
 
           // ------------------------------------------------
-          // 🔵 BUTTON A — MCQ QUESTIONS
+          //  BUTTON A — MCQ QUESTIONS
           // ------------------------------------------------
           FutureBuilder<double>(
             future: _getProgressPercentage(),
@@ -150,7 +150,7 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
           const SizedBox(height: 20),
 
           // ------------------------------------------------
-          // 🟢 BUTTON B — STUDY MODE
+          // BUTTON B — STUDY MODE
           // ------------------------------------------------
           FutureBuilder<double>(
             future: _getProgressPercentageStudy(),
@@ -181,7 +181,7 @@ class _GeneralKnowledgeExtraTabState extends State<GeneralKnowledgeExtraTab> {
           const SizedBox(height: 20),
 
           // ------------------------------------------------
-          // 🟧 BUTTON C — TRACKS MCQ PROGRESS ONLY
+          //  BUTTON C — TRACKS MCQ PROGRESS ONLY
           // ------------------------------------------------
           FutureBuilder<int?>(
             future: _getQuestionsProgress(),

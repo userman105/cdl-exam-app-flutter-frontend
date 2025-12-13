@@ -94,7 +94,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
                       final bool isLimitedUser = authState is AuthGuest ||
                           (authState is AuthAuthenticated &&
                               (authState.subscribed == null || authState.subscribed == false));
-                      final int allowedQuestions = isLimitedUser ? 20 : totalQuestions;
+                      final int allowedQuestions = isLimitedUser ? 2 : totalQuestions;
 
                       if (isLimitedUser && i >= allowedQuestions) {
                         _showUpgradeSnackbar();
@@ -234,7 +234,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
 
-    if (isLimitedUser && index >= 20) {
+    if (isLimitedUser && index >= 2) {
       _showUpgradeSnackbar();
       return;
     }
@@ -259,7 +259,7 @@ class _QuestionsBankTabState extends State<QuestionsBankTab> {
     final bool isLimitedUser = authState is AuthGuest ||
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
-    final int allowedQuestions = isLimitedUser ? 20 : totalQuestions;
+    final int allowedQuestions = isLimitedUser ? 2 : totalQuestions;
     final int maxPage = allowedQuestions - 1;
 
     return Padding(

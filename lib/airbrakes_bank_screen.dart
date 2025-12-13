@@ -93,7 +93,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
                                 (authState.subscribed == null ||
                                     authState.subscribed == false));
 
-                        final int subscriptionLimit = isLimitedUser ? 20 : totalQuestions;
+                        final int subscriptionLimit = isLimitedUser ? 2 : totalQuestions;
 
                         // FINAL max accessible question count
                         final int accessibleQuestions = () {
@@ -261,7 +261,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
 
-    if (isLimitedUser && index >= 20) {
+    if (isLimitedUser && index >= 2) {
       _showUpgradeSnackbar();
       return;
     }
@@ -304,7 +304,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
             prefs.getInt('airbrakes_progress_questionsbank') ?? 0;
 
         final int progressLimit = savedProgress + 1;
-        final int subscriptionLimit = isLimitedUser ? 20 : realTotalQuestions;
+        final int subscriptionLimit = isLimitedUser ? 2 : realTotalQuestions;
 
         final int accessibleQuestions = min(
             subscriptionLimit, min(progressLimit, realTotalQuestions));
@@ -352,15 +352,43 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
 
               IconButton(
                 icon: const Icon(Icons.arrow_forward),
-                onPressed: (_currentPage < maxPage)
-                    ? () => _pageController.nextPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                )
-                    : () {
-                  if (isLimitedUser) _showUpgradeSnackbar();
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  final savedProgress = prefs.getInt('progress_questionsbank') ?? 0;
+
+                  final authState = context.read<AuthCubit>().state;
+                  final bool isLimitedUser = authState is AuthGuest ||
+                      (authState is AuthAuthenticated &&
+                          (authState.subscribed == null || authState.subscribed == false));
+
+                  // FINAL computed limit (must match onPageChanged!)
+                  final int progressLimit = savedProgress + 1;
+                  final int allowedBySub = isLimitedUser ? 2 : progressLimit;
+                  final int maxPage = allowedBySub - 1;
+
+                  // ----- Button C limit (must also match onPageChanged)
+                  if (widget.questionLimit != null) {
+                    final int limitC = widget.questionLimit! - 1;
+                    if (_currentPage >= limitC) {
+                      _showUpgradeSnackbar();
+                      return;
+                    }
+                  }
+
+                  // ----- Free user subscription limit
+                  if (_currentPage >= maxPage) {
+                    _showUpgradeSnackbar();
+                    return;
+                  }
+
+                  // ----- Advance (safe)
+                  _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
                 },
               ),
+
             ],
           ),
         );

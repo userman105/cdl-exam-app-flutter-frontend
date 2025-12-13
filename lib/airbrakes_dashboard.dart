@@ -17,8 +17,11 @@ import 'services/report_storage.dart';
 import 'subscription_screen.dart';
 import 'register_screen.dart';
 import 'services/trial_manager.dart';
+import 'services/trial_manager.dart';
 import 'airbrakes_bank_screen.dart';
 import 'airbrakes_entry.dart';
+import 'package:animate_do/animate_do.dart';
+
 // =====================
 // Main Dashboard
 // =====================
@@ -58,63 +61,84 @@ class _AirbrakesDashboardState extends State<AirbrakesDashboard>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "الفرامل الهوائية",
-          style: ArabicTextStyle(arabicFont: ArabicFont.dubai,fontWeight: FontWeight.w500, fontSize: 23),
-        ),actions: [
-        IconButton(
-          icon: Image.asset(
-            "assets/icons/subscription.png",
-            width: 132,
-            height: 132,
-          ),
-          onPressed: () {
-            final authState = context.read<AuthCubit>().state;
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        elevation: 0,
 
-            // Case 1: Guest user → show dialog urging to register
-            if (authState is AuthGuest) {
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: const Text("تسجيل الحساب"),
-                    content: const Text("يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context), // cancel
-                        child: const Text("إلغاء"),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context); // close dialog
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text("تسجيل"),
-                      ),
-                    ],
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // ---------------- LEFT: Subscription ----------------
+            IconButton(
+              icon: Image.asset(
+                "assets/icons/subscription.png",
+                width: 115,
+                height: 115,
+              ),
+              onPressed: () {
+                final authState = context.read<AuthCubit>().state;
+
+                if (authState is AuthGuest) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("تسجيل الحساب"),
+                      content: const Text(
+                          "يجب عليك إنشاء حساب أولاً للاستفادة من العروض."),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("إلغاء"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterScreen(),
+                              ),
+                            );
+                          },
+                          child: const Text("تسجيل"),
+                        ),
+                      ],
+                    ),
                   );
-                },
-              );
-            }
-            // Case 2: Authenticated user → go to subscription screen
-            else if (authState is AuthAuthenticated) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const SubscriptionScreen(),
-                ),
-              );
-            }
-          },
-        ),
-      ],
+                } else if (authState is AuthAuthenticated) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SubscriptionScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
 
+            // ---------------- CENTER: Title ----------------
+            Text(
+              "الفرامل الهوائية",
+              textDirection: TextDirection.rtl,
+              style: ArabicTextStyle(
+                arabicFont: ArabicFont.dubai,
+                fontWeight: FontWeight.w500,
+                fontSize: 23,
+              ),
+            ),
+
+            // ---------------- RIGHT: Back Arrow ----------------
+            IconButton(
+              icon: const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.black,
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       ),
+
       body: Column(
         children: [
           _buildShadowDivider(),
@@ -133,6 +157,7 @@ class _AirbrakesDashboardState extends State<AirbrakesDashboard>
     );
   }
 
+
   Widget _buildShadowDivider() {
     return Container(
       height: 1,
@@ -149,30 +174,42 @@ class _AirbrakesDashboardState extends State<AirbrakesDashboard>
     );
   }
 
-  Widget _buildTabBar() {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          CustomTabButton(
-            text: "بتك الاسئلة",
-            isActive: _tabController.index == 0,
-            onTap: () => _tabController.animateTo(0),
-            underlineWidth: 86,
-          ),
-          const SizedBox(width: 12),
-          CustomTabButton(
-            text: "الأمتحانات",
-            isActive: _tabController.index == 1,
-            onTap: () => _tabController.animateTo(1),
-            underlineWidth: 50,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildTabBar() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+    child: Column(
+      children: [
+
+
+
+        const SizedBox(height: 10),
+
+        // TABS (RIGHT ALIGNED)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            CustomTabButton(
+              text: "بنك الاسئلة",
+              isActive: _tabController.index == 0,
+              onTap: () => _tabController.animateTo(0),
+            ),
+            const SizedBox(width: 28),
+            CustomTabButton(
+              text: "التمارين",
+              isActive: _tabController.index == 1,
+              onTap: () => _tabController.animateTo(1),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+
+      ],
+    ),
+  );
+
+
 }
 
 // =====================
@@ -869,62 +906,120 @@ class _AirbrakesUnitQuestionsScreenState
   }
 
 
-  Widget _buildArabicCard(Map<String, dynamic> question, List<dynamic> answers) {
+
+  Widget _buildArabicCard(
+      Map<String, dynamic> question,
+      List<dynamic> answers,
+      ) {
+    final int correctAnswerId =
+    _getCorrectAnswerIdForAirbrakes(question["questionId"]);
+
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // ---------------- Question ----------------
             Text(
               question["questionTextAr"] ?? "",
               textDirection: TextDirection.rtl,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 14),
+
+            // ---------------- Answers ----------------
             ...answers.map((ans) {
-              final isSelected = _selectedAnswerId == ans["answerId"];
-              final isCorrect = _showAnswer && ans["answerId"] == _getCorrectAnswerIdForAirbrakes(question["questionId"]);
-              final isWrong = _showAnswer && isSelected && !isCorrect;
+              final int answerId = ans["answerId"];
+
+              final bool isSelected = _selectedAnswerId == answerId;
+              final bool isCorrect =
+                  _showAnswer && answerId == correctAnswerId;
+              final bool isWrong =
+                  _showAnswer && isSelected && !isCorrect;
+
+              final Color bgColor = isCorrect
+                  ? Colors.green
+                  : isWrong
+                  ? Colors.red
+                  : isSelected
+                  ? Colors.blue.withOpacity(0.15)
+                  : Colors.white;
+
+              final Color borderColor = isCorrect
+                  ? Colors.green
+                  : isWrong
+                  ? Colors.red
+                  : isSelected
+                  ? Colors.blue
+                  : Colors.grey.shade300;
+
+              final Color textColor =
+              (isCorrect || isWrong) ? Colors.white : Colors.black;
+
+              final Widget answerTile = Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(vertical: 6),
+                padding:
+                const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderColor, width: 2),
+                  boxShadow: (isCorrect || isWrong)
+                      ? [
+                    BoxShadow(
+                      color: bgColor.withOpacity(0.6),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    )
+                  ]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        ans["answerTextAr"] ?? "",
+                        textDirection: TextDirection.rtl,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: textColor,
+                          fontWeight: (isCorrect || isWrong)
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+
+                    if (isCorrect)
+                      const Icon(Icons.check_circle,
+                          color: Colors.white, size: 26),
+
+                    if (isWrong)
+                      const Icon(Icons.cancel,
+                          color: Colors.white, size: 26),
+                  ],
+                ),
+              );
 
               return GestureDetector(
                 onTap: !_showAnswer
-                    ? () => setState(() => _selectedAnswerId = ans["answerId"])
+                    ? () => setState(() => _selectedAnswerId = answerId)
                     : null,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isCorrect
-                        ? Colors.green[100]
-                        : isWrong
-                        ? Colors.red[100]
-                        : isSelected
-                        ? Colors.blue[100]
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isCorrect
-                          ? Colors.green
-                          : isWrong
-                          ? Colors.red
-                          : Colors.grey[300]!,
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      ans["answerTextAr"] ?? "",
-                      textDirection: TextDirection.rtl,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ),
+                child: (_showAnswer && (isCorrect || isWrong))
+                    ? BounceIn(child: answerTile)
+                    : answerTile,
               );
             }),
-            const SizedBox(height: 16),
+
+            const SizedBox(height: 18),
+
+            // ---------------- Bottom Buttons ----------------
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -946,7 +1041,7 @@ class _AirbrakesUnitQuestionsScreenState
                     onPressed:
                     _showAnswer ? _nextQuestion : () => _submitAnswer(question),
                     child: Text(
-                      _showAnswer ? "التالي" : "تاكيد",
+                      _showAnswer ? "التالي" : "تأكيد",
                       style: GoogleFonts.robotoSlab(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
