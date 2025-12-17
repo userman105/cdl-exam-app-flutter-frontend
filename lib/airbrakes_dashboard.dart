@@ -21,7 +21,7 @@ import 'services/trial_manager.dart';
 import 'airbrakes_bank_screen.dart';
 import 'airbrakes_entry.dart';
 import 'package:animate_do/animate_do.dart';
-
+import 'dart:math';
 // =====================
 // Main Dashboard
 // =====================
@@ -329,14 +329,17 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
                     return const SizedBox.shrink();
                   },
                 ),
+                _buildRandomUnit(context, "امتحان فعلي", questions, 40,),
                 const SizedBox(height: 20),
-                _buildNormalUnit(context, "الاساسيات", questions, 0, 25.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildNormalUnit(context, "أنظمة المكابح", questions, 25, 50.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildNormalUnit(context, "اسوء السيناريوهات", questions, 50, 71.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildTimeAttackUnit(context, questions),
+
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "الاساسيات", questions, 0, 25.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "أنظمة المكابح", questions, 25, 50.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "اسوء السيناريوهات", questions, 50, 71.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildTimeAttackUnit(context, questions),
               ],
             ),
           ),
@@ -344,6 +347,34 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
       },
     );
   }
+
+  List<dynamic> getRandomQuestions(List<dynamic> questions, int count) {
+    if (questions.isEmpty) return [];
+
+    final random = Random();
+    final shuffled = List<dynamic>.from(questions)..shuffle(random);
+
+    return shuffled.take(count.clamp(0, questions.length)).toList();
+  }
+
+  Widget _buildRandomUnit(
+      BuildContext context,
+      String title,
+      List<dynamic> questions,
+      int count,
+      ) {
+    final randomQuestions = getRandomQuestions(questions, count);
+
+    return _buildNormalUnit(
+      context,
+      title,
+      randomQuestions,
+      0,
+      randomQuestions.length,
+    );
+  }
+
+
 
   Widget _buildNormalUnit(
       BuildContext context, String title, List<dynamic> allQuestions, int start, int end) {

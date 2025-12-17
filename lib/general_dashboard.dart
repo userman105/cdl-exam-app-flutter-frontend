@@ -20,6 +20,8 @@ import 'services/trial_manager.dart';
 import 'general_bank_screen.dart';
 import 'general_entry.dart';
 import 'package:animate_do/animate_do.dart';
+import 'dart:math';
+
 // =====================
 // General Knowledge Dashboard
 // =====================
@@ -276,7 +278,7 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
     }
   }
 
-  // 🔹 Save General progress persistently
+  //  Save General progress persistently
   Future<void> _saveProgressGeneral() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -337,16 +339,19 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
                 const SizedBox(height: 20),
 
                 //  Dynamic Units
-                _buildNormalUnit(context, "الاساسيات", questions, 0, 25.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildNormalUnit(context, "اخطاء شائعة", questions, 25, 50.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildNormalUnit(context, "اسئلة متقدمة", questions, 50, 71.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildNormalUnit(context, "اسؤء السيناريوهات", questions, 71, 95.clamp(0, total)),
+                _buildRandomUnit(
+                  context, "امتحان فعلي", questions, 40,),
                 const SizedBox(height: 20),
 
-                _buildTimeAttackUnit(context, questions),
+                // _buildNormalUnit(context, "امتحان فعلي", questions, 0, 25.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "اخطاء شائعة", questions, 25, 50.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "اسئلة متقدمة", questions, 50, 71.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "اسؤء السيناريوهات", questions, 71, 95.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildTimeAttackUnit(context, questions),
               ],
             ),
           ),
@@ -354,6 +359,33 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
       },
     );
   }
+
+  List<dynamic> getRandomQuestions(List<dynamic> questions, int count) {
+    if (questions.isEmpty) return [];
+
+    final random = Random();
+    final shuffled = List<dynamic>.from(questions)..shuffle(random);
+
+    return shuffled.take(count.clamp(0, questions.length)).toList();
+  }
+
+  Widget _buildRandomUnit(
+      BuildContext context,
+      String title,
+      List<dynamic> questions,
+      int count,
+      ) {
+    final randomQuestions = getRandomQuestions(questions, count);
+
+    return _buildNormalUnit(
+      context,
+      title,
+      randomQuestions,
+      0,
+      randomQuestions.length,
+    );
+  }
+
 
   //  Standard Unit
   Widget _buildNormalUnit(BuildContext context, String title,
@@ -369,9 +401,8 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
       onTap: () async {
         final unitQuestions = allQuestions.sublist(start, end);
 
-        //  Apply correct answer formula for general knowledge
         for (int i = 0; i < unitQuestions.length; i++) {
-          final qIndex = start + i + 136; // general base
+          final qIndex = start + i + 136;
           unitQuestions[i]["correctAnswerId"] = 406 + (qIndex - 136);
         }
 
@@ -381,69 +412,69 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
   }
 
   //  Time Attack Unit
-  Widget _buildTimeAttackUnit(BuildContext context, List<dynamic> allQuestions) {
-    if (allQuestions.isEmpty) return const SizedBox.shrink();
-
-    return UnitButton(
-      title: "امتحان ضد الزمن",
-      questionCount: 20,
-      progress: _unitProgressGeneral["Time Attack"] ?? 0.0,
-      accentColor: kPrimaryColor,
-      icon: Icons.timer_outlined,
-      onTap: () async {
-        final start = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text("امتحان ضدالوقت"),
-            content: const Text(
-              "لديك عشر ثواني لاجابة كل سؤال",
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Start")),
-            ],
-          ),
-        );
-
-        if (start != true) return;
-
-        final randomized = List<dynamic>.from(allQuestions)..shuffle();
-        final selected = randomized.take(20).toList();
-
-        //  Apply formula
-        for (int i = 0; i < selected.length; i++) {
-          final qIndex = i + 136;
-          selected[i]["correctAnswerId"] = 406 + (qIndex - 136);
-        }
-
-        final result = await Navigator.push<Map<String, dynamic>>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => GeneralKnowledgeUnitQuestionsScreen(
-              title: "⚡ Time Attack",
-              questions: selected,
-              startIndex: 0,
-              endIndex: selected.length,
-              isTimed: true,
-              dashboardName: 'General',
-            ),
-          ),
-        );
-
-// Optional: handle result after exam ends
-        if (result != null) {
-          final progress = result["progress"] as double? ?? 0.0;
-          final selectedAnswers = result["selectedAnswers"] as Map<int, int?>?;
-
-          // You can use these values to update progress tracking or analytics
-          debugPrint("Progress: $progress");
-          debugPrint("Selected answers: $selectedAnswers");
-        }
-
-      },
-    );
-  }
+//   Widget _buildTimeAttackUnit(BuildContext context, List<dynamic> allQuestions) {
+//     if (allQuestions.isEmpty) return const SizedBox.shrink();
+//
+//     return UnitButton(
+//       title: "امتحان ضد الزمن",
+//       questionCount: 20,
+//       progress: _unitProgressGeneral["Time Attack"] ?? 0.0,
+//       accentColor: kPrimaryColor,
+//       icon: Icons.timer_outlined,
+//       onTap: () async {
+//         final start = await showDialog<bool>(
+//           context: context,
+//           builder: (context) => AlertDialog(
+//             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//             title: const Text("امتحان ضدالوقت"),
+//             content: const Text(
+//               "لديك عشر ثواني لاجابة كل سؤال",
+//             ),
+//             actions: [
+//               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+//               ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Start")),
+//             ],
+//           ),
+//         );
+//
+//         if (start != true) return;
+//
+//         final randomized = List<dynamic>.from(allQuestions)..shuffle();
+//         final selected = randomized.take(20).toList();
+//
+//         //  Apply formula
+//         for (int i = 0; i < selected.length; i++) {
+//           final qIndex = i + 136;
+//           selected[i]["correctAnswerId"] = 406 + (qIndex - 136);
+//         }
+//
+//         final result = await Navigator.push<Map<String, dynamic>>(
+//           context,
+//           MaterialPageRoute(
+//             builder: (_) => GeneralKnowledgeUnitQuestionsScreen(
+//               title: "⚡ Time Attack",
+//               questions: selected,
+//               startIndex: 0,
+//               endIndex: selected.length,
+//               isTimed: true,
+//               dashboardName: 'General',
+//             ),
+//           ),
+//         );
+//
+// // Optional: handle result after exam ends
+//         if (result != null) {
+//           final progress = result["progress"] as double? ?? 0.0;
+//           final selectedAnswers = result["selectedAnswers"] as Map<int, int?>?;
+//
+//           // You can use these values to update progress tracking or analytics
+//           debugPrint("Progress: $progress");
+//           debugPrint("Selected answers: $selectedAnswers");
+//         }
+//
+//       },
+//     );
+//   }
 
   //  Previous Mistakes Unit
   Widget _buildPreviousMistakesUnit(BuildContext context, Map<String, dynamic> exam) {
@@ -485,7 +516,7 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
   }
 
 
-  // 🔹 Unified Navigation Handler
+
   Future<void> _navigateToUnit(
       BuildContext context,
       String title,
@@ -580,6 +611,7 @@ class GeneralKnowledgeUnitQuestionsScreen extends StatefulWidget {
 class _GeneralKnowledgeUnitQuestionsScreenState
     extends State<GeneralKnowledgeUnitQuestionsScreen> {
   late DateTime _startTime;
+  bool _isFinishingExam = false;
   int _currentIndex = 0;
   int _correctCount = 0;
   int _wrongCount = 0;
@@ -777,13 +809,13 @@ class _GeneralKnowledgeUnitQuestionsScreenState
     );
 
     if (!mounted) return;
+    _isFinishingExam = true;
     final progress = (_currentIndex + 1) / totalQuestions;
 
 // Ensure safe pop after dialog is fully dismissed
-    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        Navigator.of(context).maybePop({
+        Navigator.of(context).pop({
           "progress": progress,
           "selectedAnswers": context.read<ExamCubit>().selectedAnswers,
         });
@@ -800,14 +832,27 @@ class _GeneralKnowledgeUnitQuestionsScreenState
 
     return WillPopScope(
       onWillPop: () async {
+        // ✅ Allow silent exit if exam finished
+        if (_isFinishingExam) {
+          return true;
+        }
+
         final confirm = await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text("تحذير"),
-            content: const Text("هل أنت متأكد أنك تريد مغادرة الامتحان؟ لن يتم حفظ التقدم."),
+            content: const Text(
+              "هل أنت متأكد أنك تريد مغادرة الامتحان؟ لن يتم حفظ التقدم.",
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("لا")),
-              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("نعم")),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("لا"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("نعم"),
+              ),
             ],
           ),
         );
@@ -815,14 +860,19 @@ class _GeneralKnowledgeUnitQuestionsScreenState
         if (confirm != true) return false;
 
         final progress = (_currentIndex + 1) / widget.questions.length;
+
         Navigator.of(context).pop({
           "progress": progress,
-          "selectedAnswers": context.read<ExamCubit>().state is ExamLoaded
-              ? (context.read<ExamCubit>().state as ExamLoaded).selectedAnswers
+          "selectedAnswers":
+          context.read<ExamCubit>().state is ExamLoaded
+              ? (context.read<ExamCubit>().state as ExamLoaded)
+              .selectedAnswers
               : <int, int?>{},
         });
+
         return false;
       },
+
 
       child: Scaffold(
         appBar: AppBar(title: Text(widget.title)),

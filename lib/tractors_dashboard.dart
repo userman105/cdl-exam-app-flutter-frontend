@@ -21,6 +21,7 @@ import 'package:shimmer/shimmer.dart';
 import 'tractors_bank_screen.dart';
 import 'tractors_entry.dart';
 import 'package:animate_do/animate_do.dart';
+import 'dart:math';
 
 // =====================
 // Main Dashboard
@@ -333,11 +334,15 @@ class _UnitsTabState extends State<UnitsTab> {
                   },
                 ),
                 const SizedBox(height: 20),
-                _buildNormalUnit(context, "الأساسيات", questions, 0, 30.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildNormalUnit(context, "رخصة قيادة تجارية: جرارات", questions, 30, 64.clamp(0, total)),
-                const SizedBox(height: 20),
-                _buildTimeAttackUnit(context, questions),
+
+                _buildRandomUnit(
+                  context,"امتحان فعلي",questions, 40,), const SizedBox(height: 20),
+
+                // _buildNormalUnit(context, "امتحان فعلي", questions, 0, 40.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildNormalUnit(context, "رخصة قيادة تجارية: جرارات", questions, 30, 64.clamp(0, total)),
+                // const SizedBox(height: 20),
+                // _buildTimeAttackUnit(context, questions),
               ],
             ),
           ),
@@ -345,6 +350,34 @@ class _UnitsTabState extends State<UnitsTab> {
       },
     );
   }
+
+  List<dynamic> getRandomQuestions(List<dynamic> questions, int count) {
+    if (questions.isEmpty) return [];
+
+    final random = Random();
+    final shuffled = List<dynamic>.from(questions)..shuffle(random);
+
+    return shuffled.take(count.clamp(0, questions.length)).toList();
+  }
+
+  Widget _buildRandomUnit(
+      BuildContext context,
+      String title,
+      List<dynamic> questions,
+      int count,
+      ) {
+    final randomQuestions = getRandomQuestions(questions, count);
+
+    return _buildNormalUnit(
+      context,
+      title,
+      randomQuestions,
+      0,
+      randomQuestions.length,
+    );
+  }
+
+
 
   Widget _buildNormalUnit(
       BuildContext context,
