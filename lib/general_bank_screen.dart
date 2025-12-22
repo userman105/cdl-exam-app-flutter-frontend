@@ -372,8 +372,6 @@ class _GeneralKnowledgeQuestionsTabState
         (authState is AuthAuthenticated &&
             (authState.subscribed == null || authState.subscribed == false));
 
-    // SAME BEHAVIOR AS QuestionsBankTab:
-    // Limited users can ONLY access first 7 questions
     final int allowedQuestions = isLimitedUser ? 7 : questions.length;
 
     if (isLimitedUser && index >= allowedQuestions) {

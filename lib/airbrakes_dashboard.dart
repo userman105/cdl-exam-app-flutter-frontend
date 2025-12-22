@@ -285,7 +285,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
 
   void _updateProgressAirbrakes(String title, double progress) {
     setState(() => _unitProgressAirbrakes[title] = progress);
-    _saveProgressAirbrakes(); // 🔹 persist immediately
+    _saveProgressAirbrakes();
   }
 
   @override
@@ -307,13 +307,13 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
             child: Column(
               children: [
 
-                if (!_isSubscribed) ...[
-                  Text(
-                    "المحاولات المتبقية اليوم: $_remainingTrials / 10",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                ],
+                // if (!_isSubscribed) ...[
+                //   Text(
+                //     "المحاولات المتبقية اليوم: $_remainingTrials / 10",
+                //     style: const TextStyle(fontWeight: FontWeight.bold),
+                //   ),
+                //   const SizedBox(height: 10),
+                // ],
 
                 FutureBuilder<Map<String, dynamic>?>(
                   future: _mistakesExamFuture,
@@ -851,9 +851,9 @@ class _AirbrakesUnitQuestionsScreenState
             children: [
               _headerStatusBox(),
               const SizedBox(height: 16),
-              _buildEnglishCard(question, answers),
-              const SizedBox(height: 16),
               _buildArabicCard(question, answers),
+              const SizedBox(height: 16),
+              _buildEnglishCard(question, answers),
             ],
           ),
         ),
@@ -936,6 +936,43 @@ class _AirbrakesUnitQuestionsScreenState
     );
   }
 
+  void _showUpgradeSnackbar() {
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: AwesomeSnackbarContent(
+        title: 'اشترك الآن واستمتع بكل المزايا!',
+        message: 'قم بالترقية للوصول إلى جميع الأسئلة والمحاولات غير المحدودة!',
+        contentType: ContentType.warning,
+      ),
+      duration: const Duration(seconds: 4),
+    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(snackBar);
+  }
+
+  bool _canProceedToNextQuestion(int index, int total) {
+    final authState = context.read<AuthCubit>().state;
+
+    final bool isLimitedUser =
+        authState is AuthGuest ||
+            (authState is AuthAuthenticated &&
+                (authState.subscribed == null ||
+                    authState.subscribed == false));
+
+    final int allowedQuestions = isLimitedUser ? 7 : total;
+
+    if (isLimitedUser && index >= allowedQuestions - 1) {
+      _showUpgradeSnackbar();
+      return false;
+    }
+
+    return true;
+  }
+
 
 
   Widget _buildArabicCard(
@@ -947,22 +984,27 @@ class _AirbrakesUnitQuestionsScreenState
 
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // ---------------- Question ----------------
+            // ───────────── Question ─────────────
             Text(
               question["questionTextAr"] ?? "",
               textDirection: TextDirection.rtl,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
 
             const SizedBox(height: 14),
 
-            // ---------------- Answers ----------------
+            // ───────────── Answers ─────────────
             ...answers.map((ans) {
               final int answerId = ans["answerId"];
 
@@ -994,8 +1036,10 @@ class _AirbrakesUnitQuestionsScreenState
               final Widget answerTile = Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(vertical: 6),
-                padding:
-                const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 14,
+                ),
                 decoration: BoxDecoration(
                   color: bgColor,
                   borderRadius: BorderRadius.circular(10),
@@ -1026,11 +1070,9 @@ class _AirbrakesUnitQuestionsScreenState
                         ),
                       ),
                     ),
-
                     if (isCorrect)
                       const Icon(Icons.check_circle,
                           color: Colors.white, size: 26),
-
                     if (isWrong)
                       const Icon(Icons.cancel,
                           color: Colors.white, size: 26),
@@ -1040,7 +1082,9 @@ class _AirbrakesUnitQuestionsScreenState
 
               return GestureDetector(
                 onTap: !_showAnswer
-                    ? () => setState(() => _selectedAnswerId = answerId)
+                    ? () => setState(() {
+                  _selectedAnswerId = answerId;
+                })
                     : null,
                 child: (_showAnswer && (isCorrect || isWrong))
                     ? BounceIn(child: answerTile)
@@ -1050,7 +1094,7 @@ class _AirbrakesUnitQuestionsScreenState
 
             const SizedBox(height: 18),
 
-            // ---------------- Bottom Buttons ----------------
+            // ───────────── Bottom Actions ─────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1069,8 +1113,19 @@ class _AirbrakesUnitQuestionsScreenState
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed:
-                    _showAnswer ? _nextQuestion : () => _submitAnswer(question),
+                    onPressed: () {
+                      if (_showAnswer) {
+                        // 🚫 subscription gate before advancing
+                        if (!_canProceedToNextQuestion(
+                            _currentIndex,
+                            widget.questions.length)) {
+                          return;
+                        }
+                        _nextQuestion();
+                      } else {
+                        _submitAnswer(question);
+                      }
+                    },
                     child: Text(
                       _showAnswer ? "التالي" : "تأكيد",
                       style: GoogleFonts.robotoSlab(

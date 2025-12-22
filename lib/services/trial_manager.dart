@@ -1,12 +1,17 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TrialManager {
+  static const bool enabled = false;
   static const _keyAttempts = "available_trials";
   static const _keyLastReset = "last_trial_reset";
   static const int _dailyMax = 10;
 
-  /// Get current remaining attempts and reset if it's a new day
+
   static Future<int> getRemaining() async {
+    if (!enabled) {
+      return _dailyMax; // unlimited / always full
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
 
@@ -23,8 +28,12 @@ class TrialManager {
     return prefs.getInt(_keyAttempts) ?? _dailyMax;
   }
 
-  /// Decrement one attempt and return the updated count
+
   static Future<int> useOne() async {
+    if (!enabled) {
+      return _dailyMax; // never decreases
+    }
+
     final prefs = await SharedPreferences.getInstance();
     int left = prefs.getInt(_keyAttempts) ?? _dailyMax;
     if (left > 0) {
@@ -34,12 +43,14 @@ class TrialManager {
     return left;
   }
 
-  /// Reset to full 10 attempts
   static Future<void> reset() async {
+    if (!enabled) return;
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyAttempts, _dailyMax);
     await prefs.setString(_keyLastReset, DateTime.now().toIso8601String());
   }
+
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;

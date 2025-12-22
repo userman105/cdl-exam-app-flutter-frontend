@@ -72,9 +72,8 @@ class AuthNeedsVerification extends AuthState {
   AuthNeedsVerification({required this.email, this.password});
 }
 
-/// =====================
 /// Auth Cubit
-/// =====================
+
 
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit() : super(AuthInitial());
@@ -111,7 +110,6 @@ class AuthCubit extends Cubit<AuthState> {
         },
         options: Options(
           validateStatus: (status) {
-            // Accept 200 and 403 (unverified)
             return status == 200 || status == 403;
           },
         ),
@@ -362,9 +360,9 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  ///=============
+
   ///password recovery
-  ///=============
+
 
   Future<Map<String, dynamic>> requestPasswordReset(String email) async {
     try {
@@ -458,8 +456,6 @@ class AuthCubit extends Cubit<AuthState> {
       );
 
       final data = response.data;
-
-      // ✅ Existing user (already registered)
       if (response.statusCode == 200 && data["token"] != null) {
         final token = data["token"]["token"];
         await _storage.write(key: "auth_token", value: token);
@@ -475,7 +471,7 @@ class AuthCubit extends Cubit<AuthState> {
             username: username,
             token: token,
             photoUrl: photoUrl,
-            isExistingUser: true, // ⚠️ Existing user
+            isExistingUser: true,
           ));
         } else {
           emit(AuthError("Failed to fetch user profile after Google login"));
@@ -483,7 +479,6 @@ class AuthCubit extends Cubit<AuthState> {
         return;
       }
 
-      // ✅ New user (registered now via Google)
       if (response.statusCode == 201 ||
           (data["message"] ?? "").toString().toLowerCase().contains("created")) {
         final token = data["token"]?["token"];
@@ -499,7 +494,7 @@ class AuthCubit extends Cubit<AuthState> {
             username: username,
             token: token ?? "",
             photoUrl: photoUrl,
-            isExistingUser: false, // ✅ New user
+            isExistingUser: false,
           ));
         } else {
           emit(AuthError("Failed to fetch user profile after registration"));
@@ -548,9 +543,8 @@ class AuthCubit extends Cubit<AuthState> {
 
 
 
-  /// =====================
   /// Fetch current user info (from /me endpoint)
-  /// =====================
+
   Future<Map<String, dynamic>> fetchUserProfile() async {
     try {
       final token = await _storage.read(key: "auth_token");
@@ -576,8 +570,8 @@ class AuthCubit extends Cubit<AuthState> {
         final typeOfSubscription = user["typeOfSubscription"];
         final isSubscriptionActive = user["isSubscriptionActive"] ?? false;
 
-        print("✅ Loaded user photo URL: $photoUrl");
-        print("✅ Subscribed: $subscribed");
+        print(" Loaded user photo URL: $photoUrl");
+        print(" Subscribed: $subscribed");
 
         final updatedState = AuthAuthenticated(
           username: username,

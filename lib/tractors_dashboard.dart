@@ -306,14 +306,14 @@ class _UnitsTabState extends State<UnitsTab> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-
-                if (!_isSubscribed) ...[
-                  Text(
-                    "المحاولات المتبقية اليوم: $_remainingTrials / 10",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                ],
+                //
+                // if (!_isSubscribed) ...[
+                //   Text(
+                //     "المحاولات المتبقية اليوم: $_remainingTrials / 10",
+                //     style: const TextStyle(fontWeight: FontWeight.bold),
+                //   ),
+                //   const SizedBox(height: 10),
+                // ],
 
                 FutureBuilder<Map<String, dynamic>?>(
                   future: _mistakesExamFuture,
@@ -921,6 +921,42 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
     );
   }
 
+  void _showUpgradeSnackbar() {
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: AwesomeSnackbarContent(
+        title: 'اشترك الآن واستمتع بكل المزايا!',
+        message: 'قم بالترقية للوصول إلى جميع الأسئلة والمحاولات غير المحدودة!',
+        contentType: ContentType.warning,
+      ),
+      duration: const Duration(seconds: 4),
+    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(snackBar);
+  }
+
+  bool _canProceedToNextQuestion(int index, int total) {
+    final authState = context.read<AuthCubit>().state;
+
+    final bool isLimitedUser =
+        authState is AuthGuest ||
+            (authState is AuthAuthenticated &&
+                (authState.subscribed == null ||
+                    authState.subscribed == false));
+
+    final int allowedQuestions = isLimitedUser ? 7 : total;
+
+    if (isLimitedUser && index >= allowedQuestions - 1) {
+      _showUpgradeSnackbar();
+      return false;
+    }
+
+    return true;
+  }
 
   Widget _buildArabicCard(
       Map<String, dynamic> question,
@@ -928,23 +964,33 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       ) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // ───────────── Question ─────────────
             Text(
               question["questionTextAr"] ?? "",
               textDirection: TextDirection.rtl,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
+
             const SizedBox(height: 12),
 
+            // ───────────── Answers ─────────────
             ...answers.map((ans) {
-              final bool isSelected = _selectedAnswerId == ans["answerId"];
+              final int answerId = ans["answerId"];
+
+              final bool isSelected = _selectedAnswerId == answerId;
               final bool isCorrect =
-                  _showAnswer && ans["answerId"] == question["questionId"];
+                  _showAnswer && answerId == question["questionId"];
               final bool isWrong =
                   _showAnswer && isSelected && !isCorrect;
 
@@ -962,7 +1008,10 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
               final Widget content = Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(vertical: 6),
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 12,
+                ),
                 decoration: BoxDecoration(
                   color: bgColor,
                   borderRadius: BorderRadius.circular(10),
@@ -987,27 +1036,33 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                           fontSize: 16,
                           color: textColor,
                           fontWeight:
-                          (isCorrect || isWrong) ? FontWeight.bold : null,
+                          (isCorrect || isWrong)
+                              ? FontWeight.bold
+                              : null,
                         ),
                       ),
                     ),
-
                     if (isCorrect)
-                      const Icon(Icons.check_circle,
-                          color: Colors.white, size: 26),
-
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.white,
+                        size: 26,
+                      ),
                     if (isWrong)
-                      const Icon(Icons.cancel,
-                          color: Colors.white, size: 26),
+                      const Icon(
+                        Icons.cancel,
+                        color: Colors.white,
+                        size: 26,
+                      ),
                   ],
                 ),
               );
 
               return GestureDetector(
                 onTap: !_showAnswer
-                    ? () => setState(
-                      () => _selectedAnswerId = ans["answerId"],
-                )
+                    ? () => setState(() {
+                  _selectedAnswerId = answerId;
+                })
                     : null,
                 child: _showAnswer && (isCorrect || isWrong)
                     ? BounceIn(child: content)
@@ -1017,6 +1072,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
 
             const SizedBox(height: 16),
 
+            // ───────────── Bottom Actions ─────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1035,8 +1091,20 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed:
-                    _showAnswer ? _nextQuestion : () => _submitAnswer(question),
+                    onPressed: () {
+                      if (_showAnswer) {
+                        // 🚫 Subscription gate before moving forward
+                        if (!_canProceedToNextQuestion(
+                          _currentIndex,
+                          widget.questions.length,
+                        )) {
+                          return;
+                        }
+                        _nextQuestion();
+                      } else {
+                        _submitAnswer(question);
+                      }
+                    },
                     child: Text(
                       _showAnswer ? "التالي" : "تأكيد",
                       style: GoogleFonts.robotoSlab(
