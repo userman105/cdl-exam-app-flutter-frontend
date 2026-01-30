@@ -13,6 +13,12 @@ class CustomTabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final activeColor = theme.colorScheme.onBackground;
+    final inactiveColor =
+    theme.colorScheme.onBackground.withOpacity(0.6);
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -24,7 +30,7 @@ class CustomTabButton extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isActive ? Colors.black : Colors.black54,
+              color: isActive ? activeColor : inactiveColor,
             ),
           ),
           const SizedBox(height: 6),
@@ -35,11 +41,12 @@ class CustomTabButton extends StatelessWidget {
             curve: Curves.easeOut,
             height: 2.5,
             width: isActive ? 60 : 0,
-            color: Colors.black,
+            color: theme.colorScheme.primary,
           ),
         ],
       ),
     );
   }
 }
+
 

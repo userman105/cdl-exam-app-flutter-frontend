@@ -22,6 +22,7 @@ import 'airbrakes_bank_screen.dart';
 import 'airbrakes_entry.dart';
 import 'package:animate_do/animate_do.dart';
 import 'dart:math';
+
 // =====================
 // Main Dashboard
 // =====================
@@ -62,7 +63,7 @@ class _AirbrakesDashboardState extends State<AirbrakesDashboard>
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
 
         title: Row(
@@ -129,9 +130,9 @@ class _AirbrakesDashboardState extends State<AirbrakesDashboard>
 
             // ---------------- RIGHT: Back Arrow ----------------
             IconButton(
-              icon: const Icon(
+              icon:  Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.black,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
               onPressed: () => Navigator.pop(context),
             ),
@@ -356,7 +357,6 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
 
     return shuffled.take(count.clamp(0, questions.length)).toList();
   }
-
   Widget _buildRandomUnit(
       BuildContext context,
       String title,
@@ -364,15 +364,20 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
       int count,
       ) {
     final randomQuestions = getRandomQuestions(questions, count);
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
-    return _buildNormalUnit(
-      context,
-      title,
-      randomQuestions,
-      0,
-      randomQuestions.length,
+    return DefaultTextStyle.merge(
+      style: TextStyle(color: textColor),
+      child: _buildNormalUnit(
+        context,
+        title,
+        randomQuestions,
+        0,
+        randomQuestions.length,
+      ),
     );
   }
+
 
 
 
@@ -538,7 +543,7 @@ class _AirbrakesUnitsTabState extends State<AirbrakesUnitsTab> {
 }
 
 //-----------------------------
-//--------UNIT-QUESTIONSCREEN (No changes needed for persistence fix)
+//--------UNIT-QUESTIONSCREEN
 //----------------------------
 
 class AirbrakesUnitQuestionsScreen extends StatefulWidget {
@@ -865,7 +870,7 @@ class _AirbrakesUnitQuestionsScreenState
   Widget _buildEnglishCard(Map<String, dynamic> question, List<dynamic> answers) {
     return Card(
       elevation: 4,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -886,7 +891,7 @@ class _AirbrakesUnitQuestionsScreenState
                     style: GoogleFonts.robotoSlab(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                 ),
@@ -916,6 +921,7 @@ class _AirbrakesUnitQuestionsScreenState
                       style: GoogleFonts.robotoSlab(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color
                       ),
                     ),
                     const Divider(height: 20),
@@ -923,7 +929,9 @@ class _AirbrakesUnitQuestionsScreenState
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Text(
                         ans["answerText"] ?? "",
-                        style: const TextStyle(fontSize: 14, color: Colors.black54),
+                        style:  TextStyle(fontSize: 14,  color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+
                       ),
                     )),
                   ],
@@ -1014,21 +1022,21 @@ class _AirbrakesUnitQuestionsScreenState
               final bool isWrong =
                   _showAnswer && isSelected && !isCorrect;
 
-              final Color bgColor = isCorrect
+               Color bgColor = isCorrect
                   ? Colors.green
                   : isWrong
                   ? Colors.red
                   : isSelected
                   ? Colors.blue.withOpacity(0.15)
-                  : Colors.white;
+                  : Theme.of(context).cardColor;
 
-              final Color borderColor = isCorrect
+               Color borderColor = isCorrect
                   ? Colors.green
                   : isWrong
                   ? Colors.red
                   : isSelected
                   ? Colors.blue
-                  : Colors.grey.shade300;
+                  : Theme.of(context).cardColor;
 
               final Color textColor =
               (isCorrect || isWrong) ? Colors.white : Colors.black;
@@ -1063,7 +1071,7 @@ class _AirbrakesUnitQuestionsScreenState
                         textDirection: TextDirection.rtl,
                         style: TextStyle(
                           fontSize: 16,
-                          color: textColor,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                           fontWeight: (isCorrect || isWrong)
                               ? FontWeight.bold
                               : FontWeight.normal,
@@ -1152,7 +1160,7 @@ class _AirbrakesUnitQuestionsScreenState
       margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))

@@ -10,6 +10,7 @@ import 'blocs/auth_cubit.dart';
 import 'blocs/exam_cubit.dart';
 import 'repositories/auth_repository.dart';
 import 'general_dashboard.dart';
+import 'package:adaptive_theme/adaptive_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,9 +77,36 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: startScreen,
+    return AdaptiveTheme(
+      light: ThemeData(
+        brightness: Brightness.light,
+        primaryColor: const Color(0xFF3298CB),
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 0,
+        ),
+      ),
+      dark: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFF3298CB),
+        scaffoldBackgroundColor: Colors.black,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+      ),
+      initial: AdaptiveThemeMode.system,
+      builder: (theme, darkTheme) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: theme,
+          darkTheme: darkTheme,
+          home: startScreen,
+        );
+      },
     );
   }
 }

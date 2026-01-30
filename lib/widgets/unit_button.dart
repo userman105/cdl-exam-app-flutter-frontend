@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:arabic_font/arabic_font.dart';
 
+import 'package:flutter/material.dart';
+import 'package:arabic_font/arabic_font.dart';
+
+
 class UnitButton extends StatelessWidget {
   final String title;
   final int questionCount;
@@ -23,12 +27,19 @@ class UnitButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = accentColor ?? const Color(0xFF878C9F);
+    final theme = Theme.of(context);
+    final Color effectiveAccent = accentColor ?? theme.colorScheme.primary;
+    final Color surfaceColor = accentColor == null
+        ? theme.colorScheme.surface
+        : theme.colorScheme.surfaceVariant;
+    final Color textColor = accentColor == null
+        ? theme.colorScheme.onSurface
+        : theme.colorScheme.onSurfaceVariant;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Material(
-        color: accentColor == null ? Colors.white : const Color(0xFFF9F9FF),
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(16),
         elevation: 4,
         child: InkWell(
@@ -41,11 +52,11 @@ class UnitButton extends StatelessWidget {
               children: [
                 // ------------------ TOP ROW ------------------
                 Row(
-                  textDirection: TextDirection.rtl, // 🔥 RTL: icon & text on right
+                  textDirection: TextDirection.rtl,
                   children: [
                     // Icon (right side)
                     if (icon != null)
-                      Icon(icon, color: color, size: 28)
+                      Icon(icon, color: effectiveAccent, size: 28)
                     else if (iconAsset != null)
                       Image.asset(iconAsset!, width: 28, height: 28),
 
@@ -55,18 +66,18 @@ class UnitButton extends StatelessWidget {
                     Expanded(
                       child: Text(
                         title,
-                        textAlign: TextAlign.right, //  Ensure Arabic right alignment
+                        textAlign: TextAlign.right,
                         style: ArabicTextStyle(
                           arabicFont: ArabicFont.dubai,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: color,
+                          color: effectiveAccent,
                         ),
                       ),
                     ),
 
                     // Chevron arrow (forces to left)
-                    const Icon(Icons.chevron_left, color: Colors.black54),
+                    Icon(Icons.chevron_left, color: theme.iconTheme.color),
                   ],
                 ),
 
@@ -74,11 +85,14 @@ class UnitButton extends StatelessWidget {
 
                 // ------------------ BOTTOM ROW ------------------
                 Row(
-                  textDirection: TextDirection.rtl, //  Keep RTL order
+                  textDirection: TextDirection.rtl,
                   children: [
                     Text(
                       "$questionCount سؤال ",
-                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: textColor,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -87,10 +101,8 @@ class UnitButton extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 10,
-                          backgroundColor: const Color(0xFFD9D9D9),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            accentColor ?? Colors.blueAccent,
-                          ),
+                          backgroundColor: theme.dividerColor,
+                          valueColor: AlwaysStoppedAnimation<Color>(effectiveAccent),
                         ),
                       ),
                     ),
@@ -104,3 +116,4 @@ class UnitButton extends StatelessWidget {
     );
   }
 }
+

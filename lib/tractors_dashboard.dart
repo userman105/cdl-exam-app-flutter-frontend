@@ -63,7 +63,7 @@ class _TractorsDashboardState extends State<TractorsDashboard>
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
 
         title: Row(
@@ -130,9 +130,9 @@ class _TractorsDashboardState extends State<TractorsDashboard>
 
             // ---------------- RIGHT: Back Arrow ----------------
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.black,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
               onPressed: () => Navigator.pop(context),
             ),
@@ -824,9 +824,9 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
         appBar: AppBar(
           title: Text(widget.title,
               style: GoogleFonts.robotoSlab(fontWeight: FontWeight.w600, fontSize: 16)),
-          backgroundColor: Colors.blue[700],
+          backgroundColor: Theme.of(context).cardColor,
         ),
-        backgroundColor: const Color(0xFFF9FAFC),
+        backgroundColor: Theme.of(context).cardColor,
         body: Column(
           children: [
             _headerStatusBox(),
@@ -850,7 +850,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
   Widget _buildEnglishCard(Map<String, dynamic> question, List<dynamic> answers) {
     return Card(
       elevation: 4,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -871,7 +871,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                     style: GoogleFonts.robotoSlab(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                 ),
@@ -879,7 +879,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                   icon: AnimatedRotation(
                     turns: _isArabicExpanded ? 0.5 : 0.0,
                     duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.keyboard_arrow_down_rounded),
+                    child:  Icon(Icons.keyboard_arrow_down_rounded,color: Theme.of(context).textTheme.bodyLarge?.color,),
                   ),
                   onPressed: () => setState(() => _isArabicExpanded = !_isArabicExpanded),
                 ),
@@ -1000,7 +1000,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                   ? Colors.red
                   : isSelected
                   ? Colors.blue.shade100
-                  : Colors.white;
+                  : Theme.of(context).cardColor;
 
               final Color textColor =
               (isCorrect || isWrong) ? Colors.white : Colors.black;
@@ -1034,7 +1034,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                         textDirection: TextDirection.rtl,
                         style: TextStyle(
                           fontSize: 16,
-                          color: textColor,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
                           fontWeight:
                           (isCorrect || isWrong)
                               ? FontWeight.bold
@@ -1132,10 +1132,10 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
       margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))
+        boxShadow:  [
+          BoxShadow(color: Theme.of(context).cardColor, blurRadius: 6, offset: Offset(0, 2))
         ],
       ),
       child: Row(
@@ -1166,7 +1166,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                 child: LinearProgressIndicator(
                   value: progress,
                   minHeight: 10,
-                  backgroundColor: const Color(0xFFD9D9D9),
+                  backgroundColor: Theme.of(context).cardColor,
                   valueColor:
                   const AlwaysStoppedAnimation<Color>(Color(0xFF64B2EF)),
                 ),

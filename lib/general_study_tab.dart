@@ -71,12 +71,12 @@ class _GeneralKnowledgeStudyTabState extends State<GeneralKnowledgeStudyTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).textTheme.bodyLarge?.color),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -145,7 +145,7 @@ class _GeneralKnowledgeStudyTabState extends State<GeneralKnowledgeStudyTab> {
             padding: const EdgeInsets.all(16.0),
             child: Card(
               elevation: 4,
-              color: Colors.white,
+              color:Theme.of(context).cardColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
               child: Padding(
@@ -172,15 +172,16 @@ class _GeneralKnowledgeStudyTabState extends State<GeneralKnowledgeStudyTab> {
                                     vertical: 6),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.green[100],
+                                  color: Theme.of(context).cardColor,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: Colors.green),
                                 ),
                                 child: Text(
                                   ans["answerTextAr"],
-                                  style: const TextStyle(
+                                  style:  TextStyle(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.w600),
+                                      fontWeight: FontWeight.w600
+                                  ,color: Theme.of(context).textTheme.bodyLarge?.color),
                                 ),
                               ),
                             ),
@@ -225,7 +226,7 @@ class _GeneralKnowledgeStudyTabState extends State<GeneralKnowledgeStudyTab> {
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon:  Icon(Icons.arrow_back,color: Theme.of(context).textTheme.bodyLarge?.color,),
             onPressed: _currentPage > 0
                 ? () => _pageController.previousPage(
               duration: const Duration(milliseconds: 300),
@@ -237,9 +238,9 @@ class _GeneralKnowledgeStudyTabState extends State<GeneralKnowledgeStudyTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color:Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade400),
+                border: Border.all(color: Theme.of(context).cardColor),
               ),
               child: Center(
                 child: Text(
@@ -251,7 +252,7 @@ class _GeneralKnowledgeStudyTabState extends State<GeneralKnowledgeStudyTab> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.arrow_forward),
+            icon:  Icon(Icons.arrow_forward,color: Theme.of(context).textTheme.bodyLarge?.color,),
             onPressed: (_currentPage < maxPage)
                 ? () => _pageController.nextPage(
               duration: const Duration(milliseconds: 300),

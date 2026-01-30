@@ -63,12 +63,12 @@ class _QuestionsBankStudyTabState extends State<QuestionsBankStudyTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon:  Icon(Icons.arrow_back, color: Theme.of(context).textTheme.bodyLarge?.color),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -151,7 +151,7 @@ class _QuestionsBankStudyTabState extends State<QuestionsBankStudyTab> {
                                 margin: const EdgeInsets.symmetric(vertical: 6),
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.green[100],
+                                  color:Theme.of(context).cardColor,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: Colors.green),
                                 ),
@@ -214,9 +214,9 @@ class _QuestionsBankStudyTabState extends State<QuestionsBankStudyTab> {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade400),
+                border: Border.all(color: Theme.of(context).cardColor),
               ),
               child: Center(
                 child: Text(

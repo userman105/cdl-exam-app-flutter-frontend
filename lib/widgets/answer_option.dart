@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:cdl_flutter/constants/constants.dart';
+import 'package:flutter/services.dart';
+import '../services/haptics_manager.dart';
+
+import 'package:flutter/material.dart';
+import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:cdl_flutter/services/haptics_manager.dart';
+import 'package:animate_do/animate_do.dart';
 
 class AnswerOption extends StatelessWidget {
   final Map<String, dynamic> answer;
@@ -22,13 +29,16 @@ class AnswerOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int answerId = answer["answerId"];
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final error = theme.colorScheme.error;
+    final surface = theme.colorScheme.surface;
+    final onSurface = theme.colorScheme.onSurface;
 
+    final int answerId = answer["answerId"];
     final bool isSelected = selectedAnswer == answerId;
-    final bool isCorrect =
-        showAnswer && answerId == correctAnswerId;
-    final bool isWrong =
-        showAnswer && isSelected && answerId != correctAnswerId;
+    final bool isCorrect = showAnswer && answerId == correctAnswerId;
+    final bool isWrong = showAnswer && isSelected && answerId != correctAnswerId;
 
     // ---------- COLORS ----------
     final Color bgColor = isCorrect
@@ -36,19 +46,19 @@ class AnswerOption extends StatelessWidget {
         : isWrong
         ? Colors.red
         : isSelected
-        ? kPrimaryColor.withOpacity(0.15)
-        : Colors.white;
+        ? primary.withOpacity(0.15)
+        : surface;
 
     final Color borderColor = isCorrect
         ? Colors.green
         : isWrong
-        ? kErrorColor
+        ? error
         : isSelected
-        ? kPrimaryColor
-        : Colors.grey.shade300;
+        ? primary
+        : theme.dividerColor;
 
     final Color textColor =
-    (isCorrect || isWrong) ? Colors.white : Colors.black;
+    (isCorrect || isWrong) ? Colors.white : onSurface;
 
     // ---------- CONTENT ----------
     final Widget content = Container(
@@ -79,29 +89,31 @@ class AnswerOption extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 color: textColor,
-                fontWeight:
-                (isCorrect || isWrong) ? FontWeight.bold : FontWeight.normal,
+                fontWeight: (isCorrect || isWrong) ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ),
-
           if (isCorrect)
-            const Icon(Icons.check_circle,
-                color: Colors.white, size: 26),
-
+            const Icon(Icons.check_circle, color: Colors.white, size: 26),
           if (isWrong)
-            const Icon(Icons.cancel,
-                color: Colors.white, size: 26),
+            const Icon(Icons.cancel, color: Colors.white, size: 26),
         ],
       ),
     );
 
     // ---------- ANIMATION ----------
     return GestureDetector(
-      onTap: !showAnswer ? onTap : null,
+      onTap: !showAnswer
+          ? () {
+        final bool isWrongSelection = correctAnswerId != null && answerId != correctAnswerId;
+        if (isWrongSelection) HapticsManager.heavyImpact();
+        onTap?.call();
+      }
+          : null,
       child: showAnswer && (isCorrect || isWrong)
           ? BounceIn(child: content)
           : content,
     );
   }
 }
+

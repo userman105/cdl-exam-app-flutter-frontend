@@ -10,14 +10,36 @@ import 'saved_reports.dart';
 import 'blocs/auth_cubit.dart';
 import 'blocs/exam_cubit.dart';
 import 'subscription_screen.dart';
+import 'services/haptics_manager.dart';
+import 'package:adaptive_theme/adaptive_theme.dart';
 
-class ProfileEdit extends StatelessWidget {
+class ProfileEdit extends StatefulWidget {
   const ProfileEdit({super.key});
+
+  @override
+  State<ProfileEdit> createState() => _ProfileEditState();
+}
+class _ProfileEditState extends State<ProfileEdit> {
+  bool _hapticsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHapticsSetting();
+  }
+
+  Future<void> _loadHapticsSetting() async {
+    final enabled = await HapticsManager.isEnabled();
+    if (mounted) {
+      setState(() => _hapticsEnabled = enabled);
+    }
+  }
+
 
   void _openSettingsDrawer(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -67,11 +89,12 @@ class ProfileEdit extends StatelessWidget {
     !isGuest && authState is AuthAuthenticated ? authState.photoUrl : null;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 40),
               // Profile header
@@ -217,9 +240,102 @@ class ProfileEdit extends StatelessWidget {
                 },
               ),
 
-              const Spacer(),
 
-// ✅ Current Plan section
+              const SizedBox(height: 28),
+
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.dark_mode, size: 26),
+                        const SizedBox(width: 16),
+                        Text(
+                          "Dark Mode",
+                          style: GoogleFonts.robotoSlab(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    Switch(
+                      value: AdaptiveTheme.of(context).mode.isDark,
+                      activeColor: const Color(0xFF3298CB),
+                      onChanged: (isDark) {
+                        if (isDark) {
+                          AdaptiveTheme.of(context).setDark();
+                        } else {
+                          AdaptiveTheme.of(context).setLight();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+
+
+              const SizedBox(height: 28),
+
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.vibration, size: 26),
+                        const SizedBox(width: 16),
+                        Text(
+                          "Haptic Feedback",
+                          style: GoogleFonts.robotoSlab(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Switch(
+                      value: _hapticsEnabled,
+                      activeColor: const Color(0xFF3298CB),
+                      onChanged: (value) async {
+                        setState(() => _hapticsEnabled = value);
+                        await HapticsManager.setEnabled(value);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
               if (authState is AuthAuthenticated) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -246,11 +362,11 @@ class ProfileEdit extends StatelessWidget {
                     if (authState.subscribed == false)
                       GestureDetector(
                         onTap: () {
-                          // ✅ Navigate to your Google IAP screen
-                          Navigator.push(
+
+                            Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const SubscriptionScreen(), // <- replace with your screen
+                              builder: (_) => const SubscriptionScreen(),
                             ),
                           );
                         },
@@ -291,7 +407,6 @@ class ProfileEdit extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-
             ],
           ),
         ),
@@ -303,17 +418,21 @@ class ProfileEdit extends StatelessWidget {
     required String label,
     required String iconPath,
     required VoidCallback onTap,
-    Color labelColor = Colors.black87,
+    Color? labelColor,
   }) {
+    final color = labelColor ?? Theme.of(context).textTheme.bodyLarge?.color;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          boxShadow: Theme.of(context).brightness == Brightness.dark
+              ? []
+              : [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
               blurRadius: 6,
@@ -334,7 +453,7 @@ class ProfileEdit extends StatelessWidget {
               style: GoogleFonts.robotoSlab(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
-                color: labelColor,
+                color: color,
               ),
             ),
           ],
@@ -342,6 +461,7 @@ class ProfileEdit extends StatelessWidget {
       ),
     );
   }
+
 
   void _showErrorSnack(BuildContext context, String message) {
     final snackBar = SnackBar(

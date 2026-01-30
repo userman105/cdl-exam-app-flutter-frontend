@@ -8,7 +8,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../widgets/widgets.dart';
 import '../constants/constants.dart';
 import '../blocs/exam_cubit.dart';
@@ -51,12 +50,12 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor:Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon:  Icon(Icons.arrow_back, color: Theme.of(context).textTheme.bodyLarge?.color),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -76,8 +75,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
 
             return Column(
               children: [
-                Expanded(
-                  child: Expanded(
+                    Expanded(
                     child: FutureBuilder<SharedPreferences>(
                       future: SharedPreferences.getInstance(),
                       builder: (context, snap) {
@@ -135,8 +133,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
                     ),
                   ),
 
-                ),
-                _buildNavigationBar(totalQuestions),
+               _buildNavigationBar(totalQuestions),
               ],
             );
           }
@@ -179,7 +176,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
       int? selected) {
     return Card(
       elevation: 4,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -317,7 +314,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
           child: Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon:  Icon(Icons.arrow_back, color: Theme.of(context).textTheme.bodyLarge?.color,),
                 onPressed: _currentPage > 0
                     ? () => _pageController.previousPage(
                   duration: const Duration(milliseconds: 300),
@@ -335,9 +332,9 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade400),
+                      border: Border.all(color: Theme.of(context).cardColor),
                     ),
                     child: Center(
                       child: Text(
@@ -351,7 +348,7 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
               ),
 
               IconButton(
-                icon: const Icon(Icons.arrow_forward),
+                icon:  Icon(Icons.arrow_forward, color: Theme.of(context).textTheme.bodyLarge?.color,),
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();
                   final savedProgress = prefs.getInt('progress_questionsbank') ?? 0;
@@ -375,13 +372,13 @@ class _AirbrakesQuestionsTabState extends State<AirbrakesQuestionsTab> {
                     }
                   }
 
-                  // ----- Free user subscription limit
+
                   if (_currentPage >= maxPage) {
                     _showUpgradeSnackbar();
                     return;
                   }
 
-                  // ----- Advance (safe)
+
                   _pageController.nextPage(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,

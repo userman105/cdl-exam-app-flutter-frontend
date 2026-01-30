@@ -14,6 +14,7 @@ import 'profile_edit.dart';
 import 'airbrakes_dashboard.dart';
 import 'general_dashboard.dart';
 import 'package:arabic_font/arabic_font.dart';
+import 'package:adaptive_theme/adaptive_theme.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -22,19 +23,21 @@ class HomeScreen extends StatelessWidget {
     return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
+      builder: (context) =>  Center(
         child: SizedBox(
           width: 80,
           height: 80,
           child: Card(
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(16)),
             ),
             child: Padding(
               padding: EdgeInsets.all(20.0),
-              child: CircularProgressIndicator(color: Colors.blue),
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
           ),
         ),
@@ -90,7 +93,7 @@ class HomeScreen extends StatelessWidget {
     required BuildContext context,
     required int examId,
     required Widget Function() destinationBuilder,
-  }) async {
+     }) async {
     final examCubit = context.read<ExamCubit>();
 
     // Show spinner
@@ -194,7 +197,7 @@ class HomeScreen extends StatelessWidget {
     return WillPopScope(
       onWillPop: () => _onWillPop(context),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
             // Background photo with fade
@@ -215,11 +218,15 @@ class HomeScreen extends StatelessWidget {
                     right: 0,
                     height: 120,
                     child: Container(
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.white],
+                          colors: [
+                            Colors.transparent,
+                            Theme.of(context).scaffoldBackgroundColor,
+                          ],
+
                         ),
                       ),
                     ),
@@ -255,7 +262,7 @@ class HomeScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(40),
                     child: CircleAvatar(
                       radius: 36,
-                      backgroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).cardColor,
                       backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
                           ? NetworkImage(photoUrl)
                           : null,
@@ -280,6 +287,7 @@ class HomeScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _buildButton(
+                          context: context,
                           label: "معلومات عامة",
                           iconPath: "assets/icons/general.svg",
                           onTap: () => _loadExamAndNavigate(
@@ -291,6 +299,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                   const SizedBox(height: 40),
                   _buildButton(
+                    context: context,
                     label: "الفرامل الهوائية",
                     iconPath: "assets/icons/air_brakes.svg",
                     onTap: () => _loadExamAndNavigate(
@@ -302,6 +311,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
                   _buildButton(
+                    context: context,
                     label: "الجرار و المقطورات ",
                     iconPath: "assets/icons/tractors_and_trailers.svg",
                     onTap: () => _loadExamAndNavigate(
@@ -351,7 +361,7 @@ class HomeScreen extends StatelessWidget {
                                 style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
-                                  color: const Color(0xFF003087),
+                                  color: Theme.of(context).textTheme.bodyLarge?.color,
                                 ),
                               ),
                             ],
@@ -375,6 +385,7 @@ class HomeScreen extends StatelessWidget {
     required String label,
     required String iconPath,
     required VoidCallback onTap,
+    required BuildContext context
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -382,9 +393,11 @@ class HomeScreen extends StatelessWidget {
         width: 300,
         padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
+          boxShadow: Theme.of(context).brightness == Brightness.dark
+              ? []
+              : [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
               blurRadius: 8,
@@ -397,13 +410,14 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text(
               label,
-              style: ArabicTextStyle(arabicFont: ArabicFont.dubai,
-                  fontSize: 20, fontWeight: FontWeight.w500,color: Colors.black),
+              style: ArabicTextStyle(
+                arabicFont: ArabicFont.dubai,
+                fontSize: 20,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
             ),
-
-
-            SizedBox(width: 25,),
-
+            const SizedBox(width: 25),
             SvgPicture.asset(iconPath, height: 50, width: 50),
             const SizedBox(width: 10),
           ],
@@ -411,4 +425,5 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+
 }

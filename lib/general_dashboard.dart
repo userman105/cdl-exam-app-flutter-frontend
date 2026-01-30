@@ -21,7 +21,7 @@ import 'general_bank_screen.dart';
 import 'general_entry.dart';
 import 'package:animate_do/animate_do.dart';
 import 'dart:math';
-
+import 'package:adaptive_theme/adaptive_theme.dart';
 // =====================
 // General Knowledge Dashboard
 // =====================
@@ -63,7 +63,7 @@ class _GeneralKnowledgeDashboardState extends State<GeneralKnowledgeDashboard>
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
 
         title: Row(
@@ -130,9 +130,9 @@ class _GeneralKnowledgeDashboardState extends State<GeneralKnowledgeDashboard>
 
             // ---------------- RIGHT: Back Arrow ----------------
             IconButton(
-              icon: const Icon(
+              icon:  Icon(
                 Icons.arrow_forward_ios,
-                color: Colors.black,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
               onPressed: () => Navigator.pop(context),
             ),
@@ -166,7 +166,7 @@ class _GeneralKnowledgeDashboardState extends State<GeneralKnowledgeDashboard>
       color: Colors.black12,
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.08),
+          color:Theme.of(context).cardColor,
           blurRadius: 8,
           offset: const Offset(0, 7),
         ),
@@ -376,15 +376,21 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
       int count,
       ) {
     final randomQuestions = getRandomQuestions(questions, count);
+    final textColor = Theme.of(context).textTheme.bodyMedium?.color;
 
-    return _buildNormalUnit(
-      context,
-      title,
-      randomQuestions,
-      0,
-      randomQuestions.length,
+    return DefaultTextStyle.merge(
+      style: TextStyle(color: textColor),
+      child: _buildNormalUnit(
+        context,
+        title,
+        randomQuestions,
+        0,
+        randomQuestions.length,
+      ),
     );
   }
+
+
 
 
   //  Standard Unit
@@ -895,7 +901,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
   Widget _buildEnglishCard(Map<String, dynamic> question, List<dynamic> answers) {
     return Card(
       elevation: 4,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -916,7 +922,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                     style: GoogleFonts.robotoSlab(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Theme.of(context).textTheme.bodyLarge?.color ,
                     ),
                   ),
                 ),
@@ -1047,7 +1053,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                   ? Colors.red
                   : isSelected
                   ? Colors.blue.withOpacity(0.15)
-                  : Colors.white;
+                  : Theme.of(context).cardColor;
 
               final Color borderColor = isCorrect
                   ? Colors.green
@@ -1055,10 +1061,10 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                   ? Colors.red
                   : isSelected
                   ? Colors.blue
-                  : Colors.grey.shade300;
+                  : Theme.of(context).cardColor;
 
-              final Color textColor =
-              (isCorrect || isWrong) ? Colors.white : Colors.black;
+              final Color? textColor =
+              (isCorrect || isWrong) ? Theme.of(context).textTheme.bodyLarge?.color : Colors.black;
 
               final Widget answerTile = Container(
                 width: double.infinity,
@@ -1090,7 +1096,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                         textDirection: TextDirection.rtl,
                         style: TextStyle(
                           fontSize: 16,
-                          color: textColor,
+                          color:Theme.of(context).textTheme.bodyLarge?.color,
                           fontWeight: (isCorrect || isWrong)
                               ? FontWeight.bold
                               : FontWeight.normal,
@@ -1180,7 +1186,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
       margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2))

@@ -52,6 +52,7 @@ dependencies:
   in_app_purchase: ^3.2.3
   shimmer: ^3.0.0
   animate_do: ^4.2.0
+  adaptive_theme: ^3.7.2
 
 dev_dependencies:
   flutter_launcher_icons: ^0.13.1
