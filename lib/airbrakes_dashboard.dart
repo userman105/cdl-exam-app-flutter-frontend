@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:cdl_flutter/report_card.dart';
+import 'package:cdl_flutter/services/haptics_manager.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1121,9 +1123,13 @@ class _AirbrakesUnitQuestionsScreenState
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      //  Medium haptic feedback (respects user setting)
+                     HapticsManager.heavyImpact();
+
+
                       if (_showAnswer) {
-                        // 🚫 subscription gate before advancing
+                        // subscription gate before advancing
                         if (!_canProceedToNextQuestion(
                             _currentIndex,
                             widget.questions.length)) {
@@ -1144,6 +1150,7 @@ class _AirbrakesUnitQuestionsScreenState
                     ),
                   ),
                 ),
+
               ],
             ),
           ],

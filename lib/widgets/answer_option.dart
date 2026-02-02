@@ -36,9 +36,18 @@ class AnswerOption extends StatelessWidget {
     final onSurface = theme.colorScheme.onSurface;
 
     final int answerId = answer["answerId"];
+
     final bool isSelected = selectedAnswer == answerId;
     final bool isCorrect = showAnswer && answerId == correctAnswerId;
     final bool isWrong = showAnswer && isSelected && answerId != correctAnswerId;
+
+    // ───────────── HAPTICS ON HIGHLIGHT ─────────────
+    if (showAnswer && (isCorrect || isWrong)) {
+      // Post-frame to avoid triggering during build phase
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        HapticsManager.mediumImpact();
+      });
+    }
 
     // ---------- COLORS ----------
     final Color bgColor = isCorrect
@@ -89,7 +98,8 @@ class AnswerOption extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 color: textColor,
-                fontWeight: (isCorrect || isWrong) ? FontWeight.bold : FontWeight.normal,
+                fontWeight:
+                (isCorrect || isWrong) ? FontWeight.bold : FontWeight.normal,
               ),
             ),
           ),
@@ -101,12 +111,11 @@ class AnswerOption extends StatelessWidget {
       ),
     );
 
-    // ---------- ANIMATION ----------
+    // ---------- TAP ----------
     return GestureDetector(
       onTap: !showAnswer
-          ? () {
-        final bool isWrongSelection = correctAnswerId != null && answerId != correctAnswerId;
-        if (isWrongSelection) HapticsManager.heavyImpact();
+          ? () async {
+        HapticsManager.mediumImpact();
         onTap?.call();
       }
           : null,

@@ -1,3 +1,4 @@
+import 'package:cdl_flutter/services/haptics_manager.dart';
 import 'package:cdl_flutter/tractors_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -19,6 +20,7 @@ void main() async {
   const storage = FlutterSecureStorage();
   final savedToken = await storage.read(key: "auth_token");
   final savedUsername = await storage.read(key: "username");
+  await HapticsManager.isEnabled();
   await AirbrakesUnitQuestionsScreen.loadMistakes();
   await UnitQuestionsScreen.loadMistakes();
   await GeneralKnowledgeUnitQuestionsScreen.loadMistakes();
@@ -98,7 +100,7 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      initial: AdaptiveThemeMode.system,
+      initial: AdaptiveThemeMode.light,
       builder: (theme, darkTheme) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'package:cdl_flutter/services/haptics_manager.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -1091,13 +1093,15 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      //  Medium haptic feedback (respects user setting)
+                     HapticsManager.heavyImpact();
+
                       if (_showAnswer) {
-                        // 🚫 Subscription gate before moving forward
+                        // subscription gate before advancing
                         if (!_canProceedToNextQuestion(
-                          _currentIndex,
-                          widget.questions.length,
-                        )) {
+                            _currentIndex,
+                            widget.questions.length)) {
                           return;
                         }
                         _nextQuestion();
@@ -1115,6 +1119,7 @@ class _UnitQuestionsScreenState extends State<UnitQuestionsScreen> {
                     ),
                   ),
                 ),
+
               ],
             ),
           ],

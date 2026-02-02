@@ -273,5 +273,17 @@ class ExamCubit extends Cubit<ExamState> {
     emit(ExamLoaded(examData: examData, selectedAnswers: {}));
   }
 
+  void resetSelectedAnswers() {
+    if (state is ExamLoaded) {
+      final current = state as ExamLoaded;
+      emit(
+        current.copyWith(
+          selectedAnswers: {},
+        ),
+      );
+    }
+  }
+
+
 
 }

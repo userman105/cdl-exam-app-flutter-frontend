@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
 import 'package:cdl_flutter/report_card.dart';
+import 'package:cdl_flutter/services/haptics_manager.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -231,7 +233,6 @@ class GeneralKnowledgeUnitsTab extends StatefulWidget {
 
 class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
 
-  int _remainingTrials = 0;
   bool _isSubscribed = false; // Will come from your auth state
   final Map<String, double> _unitProgressGeneral = {};
   late Future<Map<String, dynamic>?> _mistakesExamFuture;
@@ -259,7 +260,6 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
     final attempts = await TrialManager.getRemaining();
     final authState = context.read<AuthCubit>().state;
     setState(() {
-      _remainingTrials = attempts;
       _isSubscribed = authState is AuthAuthenticated && authState.subscribed == true;
     });
   }
@@ -533,7 +533,6 @@ class _GeneralKnowledgeUnitsTabState extends State<GeneralKnowledgeUnitsTab> {
 
     if (!_isSubscribed) {
       final remaining = await TrialManager.useOne();
-      setState(() => _remainingTrials = remaining);
       if (remaining <= 0) {
         _showUpgradeDialog(context);
         return;
@@ -1146,9 +1145,13 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      //  Medium haptic feedback (respects user setting)
+                      HapticsManager.heavyImpact();
+
+
                       if (_showAnswer) {
-                        // 🚫 subscription gate before advancing
+                        // subscription gate before advancing
                         if (!_canProceedToNextQuestion(
                             _currentIndex,
                             widget.questions.length)) {
@@ -1169,6 +1172,7 @@ class _GeneralKnowledgeUnitQuestionsScreenState
                     ),
                   ),
                 ),
+
               ],
             ),
           ],

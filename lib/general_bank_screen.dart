@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:awesome_snackbar_content/awesome_snackbar_content.dart';
+import 'package:cdl_flutter/services/haptics_manager.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -43,10 +45,9 @@ class _GeneralKnowledgeQuestionsTabState
   @override
   void initState() {
     super.initState();
-
+    context.read<ExamCubit>().resetSelectedAnswers();
     if (widget.resumeFromLast) {
-      // Restore progress with dialog
-      _restoreProgress();
+    _restoreProgress();
     } else {
       // Wait for first frame, then jump to 0
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -352,7 +353,9 @@ class _GeneralKnowledgeQuestionsTabState
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           ),
-          onPressed: () => _handleShowAnswer(questions, index),
+          onPressed: () async{   HapticsManager.heavyImpact();
+
+                    _handleShowAnswer(questions, index);},
           child: Text(
             "Show Answer",
             style: GoogleFonts.robotoSlab(
